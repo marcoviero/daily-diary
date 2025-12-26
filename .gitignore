@@ -1,0 +1,17 @@
+# Environment
+.env
+.venv/
+
+# Data (keep local, don't sync PHI to GitHub)
+data/*.json
+data/*.db
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+*.swp
+
+# IDE
+.vscode/
+.idea/
