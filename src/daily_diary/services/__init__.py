@@ -1,5 +1,6 @@
 """Business logic services."""
 
+from .advisor import HealthAdvisor
 from .analysis import AnalysisService
 from .database import AnalyticsDB
 from .nutrition import NutritionEstimator
@@ -14,4 +15,5 @@ __all__ = [
     "AnalysisService", 
     "AnalyticsDB",
     "NutritionEstimator",
+    "HealthAdvisor",
 ]

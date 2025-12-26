@@ -1,6 +1,6 @@
 """DuckDB analytics database for health diary data."""
 
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -563,6 +563,57 @@ class AnalyticsDB:
             )
         """)
         
+        # ===== CONSULTATIONS TABLE =====
+        # AI Health Advisor visit records
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS consultations (
+                id VARCHAR PRIMARY KEY,
+                consultation_date DATE NOT NULL,
+                started_at TIMESTAMP NOT NULL,
+                ended_at TIMESTAMP,
+                
+                -- Data range reviewed
+                data_start_date DATE,
+                data_end_date DATE,
+                days_reviewed INTEGER,
+                
+                -- Chief complaint / reason for visit
+                chief_complaint VARCHAR,
+                
+                -- AI-generated summary
+                summary VARCHAR,
+                
+                -- Key findings from the consultation
+                key_findings VARCHAR,
+                
+                -- Patterns identified
+                patterns_identified VARCHAR,
+                
+                -- Recommendations given
+                recommendations VARCHAR,
+                
+                -- Potential triggers discussed
+                triggers_discussed VARCHAR,
+                
+                -- Follow-up actions
+                follow_up_actions VARCHAR,
+                
+                -- Conversation stats
+                message_count INTEGER DEFAULT 0,
+                
+                -- AI provider used
+                provider VARCHAR,
+                
+                -- Full conversation (JSON)
+                conversation_json VARCHAR,
+                
+                -- User notes about the consultation
+                user_notes VARCHAR,
+                
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
         # Create indexes for common queries
         self._create_indexes()
     
@@ -926,6 +977,70 @@ class AnalyticsDB:
                 result.append(f"  {row['column_name']}: {row['data_type']}")
         
         return "\n".join(result)
+    
+    def save_consultation(
+        self,
+        consultation_id: str,
+        consultation_date: date,
+        started_at: datetime,
+        ended_at: datetime,
+        days_reviewed: int,
+        chief_complaint: Optional[str],
+        summary: str,
+        key_findings: Optional[str],
+        patterns_identified: Optional[str],
+        recommendations: Optional[str],
+        triggers_discussed: Optional[str],
+        follow_up_actions: Optional[str],
+        message_count: int,
+        provider: str,
+        conversation_json: str,
+    ) -> None:
+        """Save a consultation record."""
+        data_end = consultation_date
+        data_start = consultation_date - timedelta(days=days_reviewed)
+        
+        self.conn.execute("""
+            INSERT INTO consultations (
+                id, consultation_date, started_at, ended_at,
+                data_start_date, data_end_date, days_reviewed,
+                chief_complaint, summary, key_findings, patterns_identified,
+                recommendations, triggers_discussed, follow_up_actions,
+                message_count, provider, conversation_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, [
+            consultation_id, consultation_date, started_at, ended_at,
+            data_start, data_end, days_reviewed,
+            chief_complaint, summary, key_findings, patterns_identified,
+            recommendations, triggers_discussed, follow_up_actions,
+            message_count, provider, conversation_json
+        ])
+    
+    def get_consultations(
+        self,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        limit: int = 20,
+    ) -> pd.DataFrame:
+        """Get consultation records."""
+        query = "SELECT * FROM consultations"
+        conditions = []
+        params = []
+        
+        if start_date:
+            conditions.append("consultation_date >= ?")
+            params.append(start_date)
+        if end_date:
+            conditions.append("consultation_date <= ?")
+            params.append(end_date)
+        
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        
+        query += " ORDER BY started_at DESC LIMIT ?"
+        params.append(limit)
+        
+        return self.conn.execute(query, params).df()
     
     def close(self) -> None:
         """Close database connection."""

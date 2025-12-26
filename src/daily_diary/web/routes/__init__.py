@@ -1,5 +1,5 @@
 """Web routes."""
 
-from . import analysis, entries
+from . import advisor, analysis, entries
 
-__all__ = ["entries", "analysis"]
+__all__ = ["entries", "analysis", "advisor"]
