@@ -447,5 +447,181 @@ def correlations(
             console.print("[yellow]No symptom data found for correlation analysis.[/yellow]")
 
 
+@app.command()
+def schema():
+    """Show the database schema."""
+    from .services.database import AnalyticsDB
+    
+    with AnalyticsDB() as analytics:
+        console.print(analytics.get_schema_summary())
+
+
+@app.command()
+def tables():
+    """List all database tables with row counts."""
+    from .services.database import AnalyticsDB
+    
+    with AnalyticsDB() as analytics:
+        table = Table(title="Database Tables")
+        table.add_column("Table", style="cyan")
+        table.add_column("Rows", justify="right")
+        
+        table_names = [
+            "daily_summary", "sleep", "activities", "meals", "symptoms",
+            "incidents", "weather", "vitals", "medications", "supplements", "hydration"
+        ]
+        
+        for tbl in table_names:
+            try:
+                count = analytics.query(f"SELECT COUNT(*) as n FROM {tbl}")["n"][0]
+                table.add_row(tbl, str(count))
+            except Exception:
+                table.add_row(tbl, "-")
+        
+        console.print(table)
+
+
+@app.command()
+def log_meal(
+    description: str = typer.Argument(..., help="What you ate (e.g., 'burger and fries with a coke')"),
+    meal_type: str = typer.Option("snack", "--type", "-t", help="Meal type: breakfast, lunch, dinner, snack"),
+    date_str: Optional[str] = typer.Option(None, "--date", "-d", help="Date (YYYY-MM-DD), defaults to today"),
+    no_estimate: bool = typer.Option(False, "--no-estimate", help="Skip LLM nutrition estimation"),
+):
+    """Log a meal with automatic nutrition estimation."""
+    from .services.nutrition import NutritionEstimator
+    from .services.database import AnalyticsDB
+    
+    entry_date = parse_date(date_str)
+    
+    console.print(f"\n[bold]Logging meal for {entry_date}[/bold]")
+    console.print(f"  {meal_type.capitalize()}: {description}")
+    
+    nutrition = {}
+    if not no_estimate:
+        console.print("\n[dim]Estimating nutrition...[/dim]")
+        estimator = NutritionEstimator()
+        nutrition = estimator.estimate(description, meal_type)
+        
+        if nutrition.get("source") == "llm":
+            console.print(f"[green]✓ LLM estimation (confidence: {nutrition.get('confidence', 0):.0%})[/green]")
+        else:
+            console.print("[yellow]⚠ Heuristic estimation (LLM unavailable)[/yellow]")
+        
+        # Show nutrition summary
+        table = Table(title="Nutritional Estimate")
+        table.add_column("Nutrient", style="cyan")
+        table.add_column("Amount", justify="right")
+        
+        table.add_row("Calories", f"{nutrition.get('calories', 0):.0f} kcal")
+        table.add_row("Protein", f"{nutrition.get('protein_g', 0):.1f} g")
+        table.add_row("Carbs", f"{nutrition.get('carbs_g', 0):.1f} g")
+        table.add_row("Fat", f"{nutrition.get('fat_g', 0):.1f} g")
+        table.add_row("Fiber", f"{nutrition.get('fiber_g', 0):.1f} g")
+        
+        if nutrition.get('caffeine_mg', 0) > 0:
+            table.add_row("Caffeine", f"{nutrition.get('caffeine_mg', 0):.0f} mg")
+        if nutrition.get('alcohol_units', 0) > 0:
+            table.add_row("Alcohol", f"{nutrition.get('alcohol_units', 0):.1f} units")
+        
+        console.print(table)
+        
+        if nutrition.get("reasoning"):
+            console.print(f"\n[dim]Reasoning: {nutrition['reasoning']}[/dim]")
+    
+    # Save to database
+    with AnalyticsDB() as analytics:
+        meal_id = analytics.add_meal_with_nutrition(
+            entry_date=entry_date,
+            meal_type=meal_type,
+            description=description,
+            nutrition=nutrition,
+        )
+        console.print(f"\n[green]✓ Meal saved (ID: {meal_id[:8]}...)[/green]")
+
+
+@app.command()
+def nutrition(
+    days: int = typer.Option(7, "--days", "-n", help="Number of days to show"),
+):
+    """Show nutrition summary for recent days."""
+    from .services.database import AnalyticsDB
+    from datetime import timedelta
+    
+    end_date = date.today()
+    start_date = end_date - timedelta(days=days)
+    
+    with AnalyticsDB() as analytics:
+        df = analytics.get_nutrition_summary(start_date, end_date)
+        
+        if df.empty:
+            console.print("[yellow]No meal data found. Log meals with 'diary log-meal'[/yellow]")
+            return
+        
+        table = Table(title=f"Nutrition Summary (last {days} days)")
+        table.add_column("Date", style="cyan")
+        table.add_column("Meals", justify="right")
+        table.add_column("Calories", justify="right")
+        table.add_column("Protein", justify="right")
+        table.add_column("Carbs", justify="right")
+        table.add_column("Fat", justify="right")
+        
+        for _, row in df.iterrows():
+            table.add_row(
+                str(row['entry_date']),
+                str(int(row['meal_count'])),
+                f"{row['total_calories']:.0f}" if row['total_calories'] else "-",
+                f"{row['total_protein_g']:.0f}g" if row['total_protein_g'] else "-",
+                f"{row['total_carbs_g']:.0f}g" if row['total_carbs_g'] else "-",
+                f"{row['total_fat_g']:.0f}g" if row['total_fat_g'] else "-",
+            )
+        
+        console.print(table)
+
+
+@app.command()
+def sleep_trends(
+    days: int = typer.Option(14, "--days", "-n", help="Number of days to show"),
+):
+    """Show sleep trends for recent days."""
+    from .services.database import AnalyticsDB
+    from datetime import timedelta
+    
+    end_date = date.today()
+    start_date = end_date - timedelta(days=days)
+    
+    with AnalyticsDB() as analytics:
+        df = analytics.get_sleep_trends(start_date, end_date)
+        
+        if df.empty:
+            console.print("[yellow]No sleep data found. Fetch data with 'diary fetch'[/yellow]")
+            return
+        
+        table = Table(title=f"Sleep Trends (last {days} days)")
+        table.add_column("Date", style="cyan")
+        table.add_column("Score", justify="right")
+        table.add_column("Duration", justify="right")
+        table.add_column("Deep", justify="right")
+        table.add_column("REM", justify="right")
+        table.add_column("HRV", justify="right")
+        table.add_column("Efficiency", justify="right")
+        
+        for _, row in df.iterrows():
+            hours = int(row['total_sleep_minutes'] // 60) if row['total_sleep_minutes'] else 0
+            mins = int(row['total_sleep_minutes'] % 60) if row['total_sleep_minutes'] else 0
+            
+            table.add_row(
+                str(row['entry_date']),
+                f"{int(row['sleep_score'])}" if row['sleep_score'] else "-",
+                f"{hours}h {mins}m" if row['total_sleep_minutes'] else "-",
+                f"{int(row['deep_sleep_minutes'])}m" if row['deep_sleep_minutes'] else "-",
+                f"{int(row['rem_sleep_minutes'])}m" if row['rem_sleep_minutes'] else "-",
+                f"{int(row['hrv_average'])}" if row['hrv_average'] else "-",
+                f"{int(row['efficiency_percent'])}%" if row['efficiency_percent'] else "-",
+            )
+        
+        console.print(table)
+
+
 if __name__ == "__main__":
     app()

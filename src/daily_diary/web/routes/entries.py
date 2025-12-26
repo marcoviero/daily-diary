@@ -1,11 +1,12 @@
 """Routes for diary entries."""
 
+import tempfile
 from datetime import date, datetime, time
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Form, Query, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, File, Form, Query, Request, UploadFile
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from ...clients import OuraClient, StravaClient, WeatherClient
@@ -297,3 +298,77 @@ async def view_entry(
             "entry": entry,
         },
     )
+
+
+# API Endpoints
+
+@router.post("/api/transcribe")
+async def transcribe_audio(
+    audio: UploadFile = File(...),
+    entry_date: str = Form(...),
+):
+    """
+    Transcribe audio recording and append to entry notes.
+    
+    Uses OpenAI Whisper API or Anthropic for transcription.
+    """
+    from ...services.transcription import TranscriptionService
+    from ...utils.config import get_settings
+    
+    settings = get_settings()
+    target_date = datetime.strptime(entry_date, "%Y-%m-%d").date()
+    
+    # Check if transcription is available
+    if not settings.openai_api_key:
+        return JSONResponse(
+            {"success": False, "error": "Transcription not configured. Add OPENAI_API_KEY to .env"},
+            status_code=400
+        )
+    
+    try:
+        # Save uploaded audio to temp file
+        with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
+            content = await audio.read()
+            tmp.write(content)
+            tmp_path = Path(tmp.name)
+        
+        # Transcribe
+        transcription_service = TranscriptionService()
+        text = transcription_service.transcribe_file(tmp_path)
+        
+        # Clean up temp file
+        tmp_path.unlink()
+        
+        if not text:
+            return JSONResponse(
+                {"success": False, "error": "Transcription returned empty result"},
+                status_code=400
+            )
+        
+        # Append to entry notes
+        with get_storage() as storage:
+            entry = storage.get_or_create_entry(target_date)
+            
+            # Add transcribed text to general notes
+            timestamp = datetime.now().strftime("%H:%M")
+            new_note = f"[Voice note {timestamp}] {text}"
+            
+            if entry.general_notes:
+                entry.general_notes = f"{entry.general_notes}\n\n{new_note}"
+            else:
+                entry.general_notes = new_note
+            
+            entry.updated_at = datetime.now()
+            storage.save_entry(entry)
+        
+        return JSONResponse({
+            "success": True,
+            "transcription": text,
+            "message": "Transcription added to notes"
+        })
+        
+    except Exception as e:
+        return JSONResponse(
+            {"success": False, "error": str(e)},
+            status_code=500
+        )

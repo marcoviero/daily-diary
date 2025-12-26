@@ -171,6 +171,211 @@
     </script>
     {% endif %}
     
+    <!-- Voice Recording Section -->
+    <div class="bg-purple-50 rounded-xl p-6 mb-6">
+        <div class="flex justify-between items-center">
+            <h2 class="text-lg font-semibold text-purple-800">🎤 Voice Notes</h2>
+            <button type="button" onclick="openRecordingModal()" 
+                    class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center space-x-2">
+                <span>Record Voice Note</span>
+            </button>
+        </div>
+        <p class="text-sm text-purple-600 mt-2">Record a voice note about your day — it will be transcribed and added to your notes.</p>
+        
+        {% if entry.general_notes %}
+        <div class="mt-4 p-4 bg-white rounded-lg">
+            <h4 class="font-medium text-gray-700 mb-2">Current Notes:</h4>
+            <p class="text-gray-600">{{ entry.general_notes }}</p>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Recording Modal -->
+    <div id="recording-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-xl p-8 max-w-lg w-full mx-4 shadow-2xl">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-gray-800">🎤 Record Voice Note</h3>
+                <button onclick="closeRecordingModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            
+            <!-- Recording Guide -->
+            <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                <h4 class="font-medium text-gray-700 mb-2">💡 Topics to cover:</h4>
+                <ul class="text-sm text-gray-600 space-y-1">
+                    <li>• <strong>How do you feel overall?</strong> (wellbeing, energy, mood)</li>
+                    <li>• <strong>Any symptoms?</strong> (headaches, pain, discomfort - location, severity)</li>
+                    <li>• <strong>What did you eat?</strong> (meals, snacks, drinks, caffeine, alcohol)</li>
+                    <li>• <strong>Physical activity?</strong> (exercise, steps, how it felt)</li>
+                    <li>• <strong>Sleep quality?</strong> (how you slept, when you woke)</li>
+                    <li>• <strong>Stress or triggers?</strong> (work, weather, events)</li>
+                    <li>• <strong>Medications or supplements?</strong> (what you took and when)</li>
+                </ul>
+            </div>
+            
+            <!-- Recording Controls -->
+            <div class="text-center mb-6">
+                <div id="recording-status" class="text-gray-500 mb-4">Ready to record</div>
+                
+                <div id="recording-timer" class="text-3xl font-mono text-purple-600 mb-4 hidden">00:00</div>
+                
+                <div class="flex justify-center space-x-4">
+                    <button id="start-recording-btn" onclick="startRecording()" 
+                            class="bg-red-500 text-white px-6 py-3 rounded-full hover:bg-red-600 flex items-center space-x-2">
+                        <span class="text-xl">⏺</span>
+                        <span>Start Recording</span>
+                    </button>
+                    
+                    <button id="stop-recording-btn" onclick="stopRecording()" 
+                            class="bg-gray-500 text-white px-6 py-3 rounded-full hover:bg-gray-600 hidden flex items-center space-x-2">
+                        <span class="text-xl">⏹</span>
+                        <span>Stop</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Playback and Submit -->
+            <div id="recording-result" class="hidden">
+                <audio id="audio-playback" controls class="w-full mb-4"></audio>
+                
+                <div class="flex space-x-4">
+                    <button onclick="discardRecording()" 
+                            class="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300">
+                        Discard
+                    </button>
+                    <button onclick="transcribeRecording()" 
+                            class="flex-1 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">
+                        Transcribe & Add to Notes
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Transcription Progress -->
+            <div id="transcription-progress" class="hidden text-center">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-2"></div>
+                <p class="text-gray-600">Transcribing...</p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let recordingBlob = null;
+    let timerInterval = null;
+    let recordingStartTime = null;
+    
+    function openRecordingModal() {
+        document.getElementById('recording-modal').classList.remove('hidden');
+        document.getElementById('recording-modal').classList.add('flex');
+    }
+    
+    function closeRecordingModal() {
+        document.getElementById('recording-modal').classList.add('hidden');
+        document.getElementById('recording-modal').classList.remove('flex');
+        resetRecordingUI();
+    }
+    
+    function resetRecordingUI() {
+        document.getElementById('recording-status').textContent = 'Ready to record';
+        document.getElementById('recording-timer').classList.add('hidden');
+        document.getElementById('start-recording-btn').classList.remove('hidden');
+        document.getElementById('stop-recording-btn').classList.add('hidden');
+        document.getElementById('recording-result').classList.add('hidden');
+        document.getElementById('transcription-progress').classList.add('hidden');
+        if (timerInterval) clearInterval(timerInterval);
+    }
+    
+    async function startRecording() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+            
+            mediaRecorder.ondataavailable = (event) => {
+                audioChunks.push(event.data);
+            };
+            
+            mediaRecorder.onstop = () => {
+                recordingBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                const audioUrl = URL.createObjectURL(recordingBlob);
+                document.getElementById('audio-playback').src = audioUrl;
+                document.getElementById('recording-result').classList.remove('hidden');
+                
+                // Stop all tracks
+                stream.getTracks().forEach(track => track.stop());
+            };
+            
+            mediaRecorder.start();
+            recordingStartTime = Date.now();
+            
+            // Update UI
+            document.getElementById('recording-status').textContent = '🔴 Recording...';
+            document.getElementById('recording-timer').classList.remove('hidden');
+            document.getElementById('start-recording-btn').classList.add('hidden');
+            document.getElementById('stop-recording-btn').classList.remove('hidden');
+            
+            // Start timer
+            timerInterval = setInterval(updateTimer, 1000);
+            
+        } catch (err) {
+            alert('Could not access microphone. Please allow microphone access.');
+            console.error('Recording error:', err);
+        }
+    }
+    
+    function updateTimer() {
+        const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+        const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
+        const seconds = (elapsed % 60).toString().padStart(2, '0');
+        document.getElementById('recording-timer').textContent = `${minutes}:${seconds}`;
+    }
+    
+    function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+            clearInterval(timerInterval);
+            document.getElementById('recording-status').textContent = 'Recording complete';
+            document.getElementById('stop-recording-btn').classList.add('hidden');
+        }
+    }
+    
+    function discardRecording() {
+        recordingBlob = null;
+        resetRecordingUI();
+    }
+    
+    async function transcribeRecording() {
+        if (!recordingBlob) return;
+        
+        document.getElementById('recording-result').classList.add('hidden');
+        document.getElementById('transcription-progress').classList.remove('hidden');
+        
+        const formData = new FormData();
+        formData.append('audio', recordingBlob, 'recording.webm');
+        formData.append('entry_date', '{{ entry.entry_date.isoformat() }}');
+        
+        try {
+            const response = await fetch('/entries/api/transcribe', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                // Reload page to show updated notes
+                window.location.reload();
+            } else {
+                alert('Transcription failed: ' + (result.error || 'Unknown error'));
+                resetRecordingUI();
+            }
+        } catch (err) {
+            alert('Error sending recording: ' + err.message);
+            resetRecordingUI();
+        }
+    }
+    </script>
+    
     <!-- Daily Assessment -->
     <div class="bg-white rounded-xl shadow p-6 mb-6">
         <h2 class="text-xl font-semibold mb-4">📊 Daily Assessment</h2>

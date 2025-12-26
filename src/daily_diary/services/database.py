@@ -1,6 +1,6 @@
 """DuckDB analytics database for health diary data."""
 
-from datetime import date, datetime
+from datetime import date, datetime, time
 from pathlib import Path
 from typing import Optional
 
@@ -8,7 +8,6 @@ import duckdb
 import pandas as pd
 
 from ..models.entry import DiaryEntry
-from ..models.integrations import ActivityData, SleepData, WeatherData
 from ..utils.config import get_settings
 
 
@@ -16,10 +15,18 @@ class AnalyticsDB:
     """
     DuckDB database for storing and analyzing health diary data.
     
-    Stores denormalized time series data optimized for analytical queries:
-    - Daily summaries (weather, sleep, activity totals, symptom counts)
-    - Individual activities
-    - Individual symptoms
+    Comprehensive schema with dedicated tables for each health domain:
+    - daily_summary: Aggregated daily metrics for quick analysis
+    - sleep: Detailed sleep data from Oura
+    - activities: Individual exercise sessions from Strava
+    - meals: Food intake with nutritional estimates
+    - symptoms: Health symptoms with severity tracking
+    - incidents: Notable health events
+    - weather: Environmental conditions
+    - vitals: Manual measurements (weight, BP, etc.)
+    - medications: Medication tracking
+    - supplements: Supplement intake
+    - hydration: Fluid intake tracking
     """
     
     def __init__(self, db_path: Optional[Path] = None):
@@ -36,64 +43,497 @@ class AnalyticsDB:
         return self._conn
     
     def _init_schema(self) -> None:
-        """Initialize database schema."""
-        # Daily summary table - one row per day
+        """Initialize database schema with comprehensive health tables."""
+        
+        # ===== SLEEP TABLE =====
+        # Detailed sleep data from Oura Ring
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS sleep (
+                id VARCHAR PRIMARY KEY,
+                entry_date DATE NOT NULL,
+                
+                -- Timing
+                bedtime TIMESTAMP,
+                wake_time TIMESTAMP,
+                
+                -- Duration (minutes)
+                total_sleep_minutes INTEGER,
+                rem_sleep_minutes INTEGER,
+                deep_sleep_minutes INTEGER,
+                light_sleep_minutes INTEGER,
+                awake_minutes INTEGER,
+                
+                -- Quality scores (0-100)
+                sleep_score INTEGER,
+                efficiency_percent INTEGER,
+                
+                -- Physiological
+                lowest_heart_rate FLOAT,
+                average_heart_rate FLOAT,
+                hrv_average FLOAT,
+                hrv_max FLOAT,
+                respiratory_rate FLOAT,
+                body_temperature_delta FLOAT,
+                
+                -- Readiness
+                readiness_score INTEGER,
+                
+                -- Sleep stages count
+                restless_periods INTEGER,
+                
+                -- Source tracking
+                source VARCHAR DEFAULT 'oura',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                
+                UNIQUE(entry_date, source)
+            )
+        """)
+        
+        # ===== ACTIVITIES TABLE =====
+        # Exercise and movement data from Strava
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS activities (
+                id VARCHAR PRIMARY KEY,
+                entry_date DATE NOT NULL,
+                
+                -- Basic info
+                activity_type VARCHAR NOT NULL,
+                name VARCHAR,
+                description VARCHAR,
+                start_time TIMESTAMP,
+                
+                -- Duration and distance
+                duration_minutes FLOAT,
+                distance_km FLOAT,
+                elevation_gain_m FLOAT,
+                elevation_loss_m FLOAT,
+                
+                -- Speed
+                average_speed_kmh FLOAT,
+                max_speed_kmh FLOAT,
+                
+                -- Heart rate
+                average_heart_rate FLOAT,
+                max_heart_rate FLOAT,
+                heart_rate_zones_json VARCHAR,  -- JSON array of time in each zone
+                
+                -- Power (cycling)
+                average_power_watts FLOAT,
+                max_power_watts FLOAT,
+                normalized_power_watts FLOAT,
+                intensity_factor FLOAT,
+                training_stress_score FLOAT,
+                
+                -- Cadence
+                average_cadence FLOAT,
+                max_cadence FLOAT,
+                
+                -- Perceived effort
+                suffer_score FLOAT,
+                perceived_exertion INTEGER,  -- 1-10 RPE scale
+                
+                -- Calories
+                calories_burned FLOAT,
+                
+                -- Weather during activity
+                temperature_c FLOAT,
+                humidity_percent INTEGER,
+                wind_speed_kmh FLOAT,
+                
+                -- Source tracking
+                source VARCHAR DEFAULT 'strava',
+                external_id VARCHAR,  -- Strava activity ID
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # ===== MEALS TABLE =====
+        # Food intake with nutritional breakdown
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS meals (
+                id VARCHAR PRIMARY KEY,
+                entry_date DATE NOT NULL,
+                
+                -- Meal info
+                meal_type VARCHAR NOT NULL,  -- breakfast, lunch, dinner, snack, drink
+                time_consumed TIME,
+                description VARCHAR NOT NULL,
+                
+                -- Nutritional estimates (can be LLM-generated or manual)
+                calories FLOAT,
+                protein_g FLOAT,
+                carbs_g FLOAT,
+                fat_g FLOAT,
+                fiber_g FLOAT,
+                sugar_g FLOAT,
+                sodium_mg FLOAT,
+                
+                -- Micronutrients (optional)
+                vitamin_a_iu FLOAT,
+                vitamin_c_mg FLOAT,
+                vitamin_d_iu FLOAT,
+                calcium_mg FLOAT,
+                iron_mg FLOAT,
+                potassium_mg FLOAT,
+                magnesium_mg FLOAT,
+                
+                -- Hydration
+                water_ml FLOAT,
+                
+                -- Flags
+                contains_alcohol BOOLEAN DEFAULT FALSE,
+                alcohol_units FLOAT,
+                alcohol_type VARCHAR,
+                
+                contains_caffeine BOOLEAN DEFAULT FALSE,
+                caffeine_mg FLOAT,
+                
+                -- Trigger tracking (for headaches, etc.)
+                trigger_foods VARCHAR[],  -- e.g., ['aged cheese', 'red wine']
+                is_trigger_suspected BOOLEAN DEFAULT FALSE,
+                
+                -- Estimation metadata
+                nutrition_source VARCHAR DEFAULT 'estimated',  -- 'estimated', 'manual', 'scanned', 'api'
+                estimation_confidence FLOAT,  -- 0-1 confidence in nutritional estimates
+                llm_reasoning VARCHAR,  -- LLM's explanation of estimation
+                
+                -- Notes
+                notes VARCHAR,
+                
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # ===== SYMPTOMS TABLE =====
+        # Health symptoms with detailed tracking
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS symptoms (
+                id VARCHAR PRIMARY KEY,
+                entry_date DATE NOT NULL,
+                
+                -- Symptom identification
+                symptom_type VARCHAR NOT NULL,
+                symptom_subtype VARCHAR,  -- e.g., 'migraine', 'tension', 'cluster' for headaches
+                custom_type VARCHAR,
+                
+                -- Severity and timing
+                severity INTEGER NOT NULL,  -- 1-10
+                onset_time TIME,
+                end_time TIME,
+                duration_minutes INTEGER,
+                
+                -- Location (for pain-based symptoms)
+                body_location VARCHAR,
+                custom_location VARCHAR,
+                laterality VARCHAR,  -- 'left', 'right', 'bilateral', 'central'
+                
+                -- Character (for pain)
+                pain_character VARCHAR,  -- 'throbbing', 'stabbing', 'dull', 'burning', etc.
+                
+                -- Associated symptoms
+                with_nausea BOOLEAN DEFAULT FALSE,
+                with_light_sensitivity BOOLEAN DEFAULT FALSE,
+                with_sound_sensitivity BOOLEAN DEFAULT FALSE,
+                with_aura BOOLEAN DEFAULT FALSE,
+                with_visual_disturbance BOOLEAN DEFAULT FALSE,
+                
+                -- Triggers identified
+                suspected_triggers VARCHAR[],
+                
+                -- Treatment
+                treatment_taken VARCHAR,
+                treatment_effective BOOLEAN,
+                
+                -- Notes
+                notes VARCHAR,
+                
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # ===== WEATHER TABLE =====
+        # Environmental conditions
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS weather (
+                id VARCHAR PRIMARY KEY,
+                entry_date DATE NOT NULL,
+                recorded_at TIMESTAMP,
+                
+                -- Temperature
+                temp_c FLOAT,
+                temp_high_c FLOAT,
+                temp_low_c FLOAT,
+                feels_like_c FLOAT,
+                
+                -- Atmospheric
+                pressure_hpa FLOAT,
+                pressure_trend VARCHAR,  -- 'rising', 'falling', 'stable'
+                pressure_change_3h FLOAT,  -- change over 3 hours
+                humidity_percent INTEGER,
+                
+                -- Wind
+                wind_speed_kmh FLOAT,
+                wind_gust_kmh FLOAT,
+                wind_direction_deg INTEGER,
+                
+                -- Precipitation
+                precipitation_mm FLOAT,
+                precipitation_probability INTEGER,
+                
+                -- Conditions
+                description VARCHAR,
+                cloud_cover_percent INTEGER,
+                visibility_km FLOAT,
+                uv_index FLOAT,
+                
+                -- Air quality
+                aqi INTEGER,  -- Air Quality Index
+                pm25 FLOAT,
+                pm10 FLOAT,
+                
+                -- Astronomy (for seasonal affective analysis)
+                sunrise TIME,
+                sunset TIME,
+                daylight_minutes INTEGER,
+                moon_phase VARCHAR,
+                
+                -- Source
+                source VARCHAR DEFAULT 'openweathermap',
+                location_lat FLOAT,
+                location_lon FLOAT,
+                
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                
+                UNIQUE(entry_date, source)
+            )
+        """)
+        
+        # ===== VITALS TABLE =====
+        # Manual health measurements
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS vitals (
+                id VARCHAR PRIMARY KEY,
+                entry_date DATE NOT NULL,
+                recorded_at TIME,
+                
+                -- Weight
+                weight_kg FLOAT,
+                body_fat_percent FLOAT,
+                muscle_mass_kg FLOAT,
+                
+                -- Blood pressure
+                systolic_bp INTEGER,
+                diastolic_bp INTEGER,
+                
+                -- Heart
+                resting_heart_rate INTEGER,
+                
+                -- Blood glucose
+                blood_glucose_mgdl FLOAT,
+                glucose_timing VARCHAR,  -- 'fasting', 'post_meal', 'random'
+                
+                -- Temperature
+                body_temperature_c FLOAT,
+                
+                -- Respiratory
+                blood_oxygen_percent INTEGER,
+                respiratory_rate INTEGER,
+                
+                -- Other
+                notes VARCHAR,
+                source VARCHAR DEFAULT 'manual',
+                
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # ===== MEDICATIONS TABLE =====
+        # Medication tracking
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS medications (
+                id VARCHAR PRIMARY KEY,
+                entry_date DATE NOT NULL,
+                time_taken TIME,
+                
+                -- Medication info
+                name VARCHAR NOT NULL,
+                dosage VARCHAR,
+                dosage_mg FLOAT,
+                form VARCHAR,  -- 'tablet', 'capsule', 'liquid', 'injection', etc.
+                
+                -- Purpose
+                purpose VARCHAR,  -- 'pain', 'preventive', 'rescue', etc.
+                for_symptom_id VARCHAR,  -- links to symptoms table
+                
+                -- Effectiveness (tracked later)
+                effectiveness INTEGER,  -- 1-10
+                side_effects VARCHAR,
+                
+                -- Prescription info
+                is_prescription BOOLEAN DEFAULT FALSE,
+                prescribing_doctor VARCHAR,
+                
+                notes VARCHAR,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # ===== SUPPLEMENTS TABLE =====
+        # Supplement intake tracking
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS supplements (
+                id VARCHAR PRIMARY KEY,
+                entry_date DATE NOT NULL,
+                time_taken TIME,
+                
+                -- Supplement info
+                name VARCHAR NOT NULL,
+                brand VARCHAR,
+                dosage VARCHAR,
+                dosage_amount FLOAT,
+                dosage_unit VARCHAR,  -- 'mg', 'mcg', 'IU', 'g'
+                
+                -- Type
+                supplement_type VARCHAR,  -- 'vitamin', 'mineral', 'herb', 'amino_acid', etc.
+                
+                notes VARCHAR,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # ===== HYDRATION TABLE =====
+        # Fluid intake tracking
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS hydration (
+                id VARCHAR PRIMARY KEY,
+                entry_date DATE NOT NULL,
+                time_consumed TIME,
+                
+                -- Beverage info
+                beverage_type VARCHAR NOT NULL,  -- 'water', 'coffee', 'tea', 'juice', etc.
+                volume_ml FLOAT NOT NULL,
+                
+                -- Content
+                contains_caffeine BOOLEAN DEFAULT FALSE,
+                caffeine_mg FLOAT,
+                contains_alcohol BOOLEAN DEFAULT FALSE,
+                alcohol_units FLOAT,
+                contains_sugar BOOLEAN DEFAULT FALSE,
+                sugar_g FLOAT,
+                
+                -- Electrolytes
+                sodium_mg FLOAT,
+                potassium_mg FLOAT,
+                
+                notes VARCHAR,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # ===== INCIDENTS TABLE =====
+        # Notable health events
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS incidents (
+                id VARCHAR PRIMARY KEY,
+                entry_date DATE NOT NULL,
+                time_occurred TIME,
+                
+                -- Incident info
+                incident_type VARCHAR NOT NULL,
+                custom_type VARCHAR,
+                severity INTEGER,  -- 1-10
+                
+                -- Location
+                location VARCHAR,
+                custom_location VARCHAR,
+                
+                -- Details
+                description VARCHAR,
+                duration_minutes INTEGER,
+                
+                -- Triggers and causes
+                suspected_cause VARCHAR,
+                
+                -- Actions taken
+                action_taken VARCHAR,
+                medical_attention BOOLEAN DEFAULT FALSE,
+                
+                notes VARCHAR,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # ===== DAILY SUMMARY TABLE =====
+        # Aggregated daily metrics for quick analysis
         self.conn.execute("""
             CREATE TABLE IF NOT EXISTS daily_summary (
                 entry_date DATE PRIMARY KEY,
                 
-                -- Wellbeing
+                -- Subjective wellbeing
                 overall_wellbeing INTEGER,
                 energy_level INTEGER,
                 stress_level INTEGER,
                 mood VARCHAR,
+                mood_score INTEGER,  -- 1-10 numeric mood
                 
-                -- Symptom aggregates
+                -- Sleep summary (from sleep table)
+                sleep_score INTEGER,
+                total_sleep_minutes INTEGER,
+                sleep_efficiency INTEGER,
+                hrv_average FLOAT,
+                
+                -- Activity summary (from activities table)
+                activity_count INTEGER DEFAULT 0,
+                total_activity_minutes FLOAT DEFAULT 0,
+                total_distance_km FLOAT DEFAULT 0,
+                total_elevation_m FLOAT DEFAULT 0,
+                total_calories_burned FLOAT DEFAULT 0,
+                
+                -- Nutrition summary (from meals table)
+                meal_count INTEGER DEFAULT 0,
+                total_calories FLOAT DEFAULT 0,
+                total_protein_g FLOAT DEFAULT 0,
+                total_carbs_g FLOAT DEFAULT 0,
+                total_fat_g FLOAT DEFAULT 0,
+                total_fiber_g FLOAT DEFAULT 0,
+                total_water_ml FLOAT DEFAULT 0,
+                total_caffeine_mg FLOAT DEFAULT 0,
+                total_alcohol_units FLOAT DEFAULT 0,
+                
+                -- Symptom summary
                 symptom_count INTEGER DEFAULT 0,
                 worst_symptom_severity INTEGER,
                 has_headache BOOLEAN DEFAULT FALSE,
                 has_neuralgiaform BOOLEAN DEFAULT FALSE,
                 
-                -- Incident aggregates
+                -- Incident summary
                 incident_count INTEGER DEFAULT 0,
                 
-                -- Meal aggregates
-                meal_count INTEGER DEFAULT 0,
-                alcohol_units FLOAT DEFAULT 0,
-                has_caffeine BOOLEAN DEFAULT FALSE,
-                
-                -- Weather
+                -- Weather summary (from weather table)
                 temp_avg_c FLOAT,
-                temp_high_c FLOAT,
-                temp_low_c FLOAT,
                 pressure_hpa FLOAT,
+                pressure_change FLOAT,
                 humidity_percent INTEGER,
-                wind_speed_kmh FLOAT,
-                weather_description VARCHAR,
                 
-                -- Sleep (previous night)
-                sleep_score INTEGER,
-                total_sleep_minutes INTEGER,
-                deep_sleep_minutes INTEGER,
-                rem_sleep_minutes INTEGER,
-                light_sleep_minutes INTEGER,
-                sleep_efficiency INTEGER,
-                hrv_average FLOAT,
-                lowest_heart_rate FLOAT,
-                avg_heart_rate_sleep FLOAT,
-                respiratory_rate FLOAT,
-                bedtime TIMESTAMP,
-                wake_time TIMESTAMP,
+                -- Vitals summary
+                weight_kg FLOAT,
+                resting_hr INTEGER,
                 
-                -- Activity totals
-                activity_count INTEGER DEFAULT 0,
-                total_activity_minutes FLOAT DEFAULT 0,
-                total_distance_km FLOAT DEFAULT 0,
-                total_elevation_m FLOAT DEFAULT 0,
-                avg_heart_rate_activity FLOAT,
-                max_heart_rate_activity FLOAT,
-                avg_power_watts FLOAT,
-                total_suffer_score FLOAT,
+                -- Medication summary
+                medication_count INTEGER DEFAULT 0,
+                rescue_medication_used BOOLEAN DEFAULT FALSE,
+                
+                -- Supplement summary
+                supplement_count INTEGER DEFAULT 0,
+                
+                -- Notes
+                morning_notes VARCHAR,
+                evening_notes VARCHAR,
+                general_notes VARCHAR,
                 
                 -- Metadata
                 is_complete BOOLEAN DEFAULT FALSE,
@@ -101,85 +541,181 @@ class AnalyticsDB:
             )
         """)
         
-        # Individual activities table
+        # ===== CORRELATION CACHE TABLE =====
+        # Pre-computed correlations for faster analysis
         self.conn.execute("""
-            CREATE TABLE IF NOT EXISTS activities (
+            CREATE TABLE IF NOT EXISTS correlation_cache (
                 id VARCHAR PRIMARY KEY,
-                entry_date DATE,
-                activity_type VARCHAR,
-                name VARCHAR,
-                start_time TIMESTAMP,
-                duration_minutes FLOAT,
-                distance_km FLOAT,
-                elevation_gain_m FLOAT,
-                average_speed_kmh FLOAT,
-                max_speed_kmh FLOAT,
-                average_heart_rate FLOAT,
-                max_heart_rate FLOAT,
-                average_power_watts FLOAT,
-                normalized_power_watts FLOAT,
-                average_cadence FLOAT,
-                suffer_score FLOAT,
-                description VARCHAR
+                computed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                days_analyzed INTEGER,
+                start_date DATE,
+                end_date DATE,
+                
+                -- Correlation pairs
+                factor_a VARCHAR,
+                factor_b VARCHAR,
+                correlation FLOAT,
+                p_value FLOAT,
+                sample_size INTEGER,
+                
+                -- Metadata
+                is_significant BOOLEAN
             )
         """)
         
-        # Individual symptoms table
-        self.conn.execute("""
-            CREATE TABLE IF NOT EXISTS symptoms (
-                id VARCHAR PRIMARY KEY,
-                entry_date DATE,
-                symptom_type VARCHAR,
-                custom_type VARCHAR,
-                severity INTEGER,
-                location VARCHAR,
-                custom_location VARCHAR,
-                onset_time TIME,
-                duration_minutes INTEGER,
-                notes VARCHAR,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        
-        # Individual incidents table
-        self.conn.execute("""
-            CREATE TABLE IF NOT EXISTS incidents (
-                id VARCHAR PRIMARY KEY,
-                entry_date DATE,
-                incident_type VARCHAR,
-                custom_type VARCHAR,
-                location VARCHAR,
-                custom_location VARCHAR,
-                severity INTEGER,
-                description VARCHAR,
-                time_occurred TIME,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        
-        # Meals table
-        self.conn.execute("""
-            CREATE TABLE IF NOT EXISTS meals (
-                id VARCHAR PRIMARY KEY,
-                entry_date DATE,
-                meal_type VARCHAR,
-                description VARCHAR,
-                time_consumed TIME,
-                contains_alcohol BOOLEAN DEFAULT FALSE,
-                alcohol_units FLOAT,
-                contains_caffeine BOOLEAN DEFAULT FALSE,
-                trigger_foods VARCHAR[],
-                notes VARCHAR,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
+        # Create indexes for common queries
+        self._create_indexes()
+    
+    def _create_indexes(self) -> None:
+        """Create indexes for performance."""
+        indexes = [
+            "CREATE INDEX IF NOT EXISTS idx_sleep_date ON sleep(entry_date)",
+            "CREATE INDEX IF NOT EXISTS idx_activities_date ON activities(entry_date)",
+            "CREATE INDEX IF NOT EXISTS idx_meals_date ON meals(entry_date)",
+            "CREATE INDEX IF NOT EXISTS idx_symptoms_date ON symptoms(entry_date)",
+            "CREATE INDEX IF NOT EXISTS idx_symptoms_type ON symptoms(symptom_type)",
+            "CREATE INDEX IF NOT EXISTS idx_weather_date ON weather(entry_date)",
+            "CREATE INDEX IF NOT EXISTS idx_vitals_date ON vitals(entry_date)",
+            "CREATE INDEX IF NOT EXISTS idx_medications_date ON medications(entry_date)",
+            "CREATE INDEX IF NOT EXISTS idx_hydration_date ON hydration(entry_date)",
+        ]
+        for idx in indexes:
+            try:
+                self.conn.execute(idx)
+            except Exception:
+                pass  # Index may already exist
     
     def upsert_entry(self, entry: DiaryEntry) -> None:
-        """Insert or update a diary entry in the analytics database."""
-        from ..models.health import SymptomType
+        """Insert or update a diary entry across all relevant tables."""
         import uuid
+        from ..models.health import SymptomType
+        
+        entry_date = entry.entry_date
+        
+        # ===== SLEEP =====
+        if entry.integrations.sleep:
+            s = entry.integrations.sleep
+            sleep_id = f"sleep_{entry_date.isoformat()}_oura"
+            self.conn.execute("DELETE FROM sleep WHERE id = ?", [sleep_id])
+            self.conn.execute("""
+                INSERT INTO sleep (
+                    id, entry_date, bedtime, wake_time,
+                    total_sleep_minutes, rem_sleep_minutes, deep_sleep_minutes,
+                    light_sleep_minutes, awake_minutes,
+                    sleep_score, efficiency_percent,
+                    lowest_heart_rate, average_heart_rate, hrv_average,
+                    respiratory_rate, readiness_score, restless_periods, source
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, [
+                sleep_id, entry_date, s.bedtime, s.wake_time,
+                s.total_sleep_minutes, s.rem_sleep_minutes, s.deep_sleep_minutes,
+                s.light_sleep_minutes, s.awake_minutes,
+                s.sleep_score, s.efficiency_percent,
+                s.lowest_heart_rate, s.average_heart_rate, s.hrv_average,
+                s.respiratory_rate, s.readiness_score, s.restless_periods, 'oura'
+            ])
+        
+        # ===== ACTIVITIES =====
+        self.conn.execute("DELETE FROM activities WHERE entry_date = ?", [entry_date])
+        for activity in entry.integrations.activities or []:
+            activity_id = activity.activity_id or str(uuid.uuid4())
+            self.conn.execute("""
+                INSERT INTO activities (
+                    id, entry_date, activity_type, name, description, start_time,
+                    duration_minutes, distance_km, elevation_gain_m,
+                    average_speed_kmh, max_speed_kmh,
+                    average_heart_rate, max_heart_rate,
+                    average_power_watts, normalized_power_watts,
+                    average_cadence, suffer_score, source, external_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, [
+                activity_id, entry_date, activity.activity_type, activity.name,
+                activity.description, activity.start_time,
+                activity.duration_minutes, activity.distance_km, activity.elevation_gain_m,
+                activity.average_speed_kmh, activity.max_speed_kmh,
+                activity.average_heart_rate, activity.max_heart_rate,
+                activity.average_power_watts, activity.normalized_power_watts,
+                activity.average_cadence, activity.suffer_score, 'strava', activity.activity_id
+            ])
+        
+        # ===== WEATHER =====
+        if entry.integrations.weather:
+            w = entry.integrations.weather
+            weather_id = f"weather_{entry_date.isoformat()}_owm"
+            self.conn.execute("DELETE FROM weather WHERE id = ?", [weather_id])
+            self.conn.execute("""
+                INSERT INTO weather (
+                    id, entry_date, temp_c, temp_high_c, temp_low_c,
+                    pressure_hpa, humidity_percent, wind_speed_kmh, description, source
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, [
+                weather_id, entry_date, w.temp_avg_c, w.temp_high_c, w.temp_low_c,
+                w.pressure_hpa, w.humidity_percent, w.wind_speed_kmh, w.description, 'openweathermap'
+            ])
+        
+        # ===== MEALS =====
+        self.conn.execute("DELETE FROM meals WHERE entry_date = ?", [entry_date])
+        for meal in entry.meals:
+            meal_id = str(uuid.uuid4())
+            self.conn.execute("""
+                INSERT INTO meals (
+                    id, entry_date, meal_type, time_consumed, description,
+                    contains_alcohol, alcohol_units, contains_caffeine,
+                    trigger_foods, notes, nutrition_source
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, [
+                meal_id, entry_date, meal.meal_type.value, meal.time_consumed,
+                meal.description, meal.contains_alcohol, meal.alcohol_units,
+                meal.contains_caffeine, meal.trigger_foods, meal.notes, 'manual'
+            ])
+        
+        # ===== SYMPTOMS =====
+        self.conn.execute("DELETE FROM symptoms WHERE entry_date = ?", [entry_date])
+        for symptom in entry.symptoms:
+            symptom_id = str(uuid.uuid4())
+            self.conn.execute("""
+                INSERT INTO symptoms (
+                    id, entry_date, symptom_type, custom_type, severity,
+                    onset_time, duration_minutes, body_location, custom_location, notes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, [
+                symptom_id, entry_date, symptom.type.value, symptom.custom_type,
+                symptom.severity.value, symptom.onset_time, symptom.duration_minutes,
+                symptom.location.value if symptom.location else None,
+                symptom.custom_location, symptom.notes
+            ])
+        
+        # ===== INCIDENTS =====
+        self.conn.execute("DELETE FROM incidents WHERE entry_date = ?", [entry_date])
+        for incident in entry.incidents:
+            incident_id = str(uuid.uuid4())
+            self.conn.execute("""
+                INSERT INTO incidents (
+                    id, entry_date, incident_type, custom_type, severity,
+                    location, custom_location, description, time_occurred
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, [
+                incident_id, entry_date, incident.type.value, incident.custom_type,
+                incident.severity.value, 
+                incident.location.value if incident.location else None,
+                incident.custom_location, incident.description, incident.time_occurred
+            ])
+        
+        # ===== DAILY SUMMARY =====
+        self._update_daily_summary(entry)
+    
+    def _update_daily_summary(self, entry: DiaryEntry) -> None:
+        """Update the daily summary table with aggregated data."""
+        from ..models.health import SymptomType
+        
+        entry_date = entry.entry_date
         
         # Calculate aggregates
+        activities = entry.integrations.activities or []
+        total_activity_mins = sum(a.duration_minutes for a in activities)
+        total_distance = sum(a.distance_km or 0 for a in activities)
+        total_elevation = sum(a.elevation_gain_m or 0 for a in activities)
+        
         worst_severity = max((s.severity.value for s in entry.symptoms), default=None)
         has_headache = any(
             s.type in (SymptomType.HEADACHE, SymptomType.HEADACHE_NEURALGIAFORM)
@@ -191,112 +727,71 @@ class AnalyticsDB:
         )
         
         total_alcohol = sum(m.alcohol_units or 0 for m in entry.meals if m.contains_alcohol)
-        has_caffeine = any(m.contains_caffeine for m in entry.meals)
         
-        # Activity aggregates
-        activities = entry.integrations.activities or []
-        total_activity_mins = sum(a.duration_minutes for a in activities)
-        total_distance = sum(a.distance_km or 0 for a in activities)
-        total_elevation = sum(a.elevation_gain_m or 0 for a in activities)
-        
-        hr_values = [a.average_heart_rate for a in activities if a.average_heart_rate]
-        avg_hr = sum(hr_values) / len(hr_values) if hr_values else None
-        max_hr = max((a.max_heart_rate or 0 for a in activities), default=None)
-        
-        power_values = [a.average_power_watts for a in activities if a.average_power_watts]
-        avg_power = sum(power_values) / len(power_values) if power_values else None
-        
-        total_suffer = sum(a.suffer_score or 0 for a in activities)
-        
-        # Weather data
+        s = entry.integrations.sleep
         w = entry.integrations.weather
         
-        # Sleep data
-        s = entry.integrations.sleep
-        
-        # Upsert daily summary
         self.conn.execute("""
-            INSERT OR REPLACE INTO daily_summary VALUES (
-                ?, ?, ?, ?, ?,
-                ?, ?, ?, ?,
-                ?,
-                ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?
-            )
+            INSERT OR REPLACE INTO daily_summary (
+                entry_date,
+                overall_wellbeing, energy_level, stress_level, mood,
+                sleep_score, total_sleep_minutes, sleep_efficiency, hrv_average,
+                activity_count, total_activity_minutes, total_distance_km, total_elevation_m,
+                meal_count, total_alcohol_units,
+                symptom_count, worst_symptom_severity, has_headache, has_neuralgiaform,
+                incident_count,
+                temp_avg_c, pressure_hpa, humidity_percent,
+                morning_notes, evening_notes, general_notes,
+                is_complete, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, [
-            entry.entry_date,
+            entry_date,
             entry.overall_wellbeing, entry.energy_level, entry.stress_level, entry.mood,
+            s.sleep_score if s else None, s.total_sleep_minutes if s else None,
+            s.efficiency_percent if s else None, s.hrv_average if s else None,
+            len(activities), total_activity_mins, total_distance, total_elevation,
+            len(entry.meals), total_alcohol,
             len(entry.symptoms), worst_severity, has_headache, has_neuralgiaform,
             len(entry.incidents),
-            len(entry.meals), total_alcohol, has_caffeine,
-            w.temp_avg_c if w else None, w.temp_high_c if w else None, w.temp_low_c if w else None,
-            w.pressure_hpa if w else None, w.humidity_percent if w else None,
-            w.wind_speed_kmh if w else None, w.description if w else None,
-            s.sleep_score if s else None, s.total_sleep_minutes if s else None,
-            s.deep_sleep_minutes if s else None, s.rem_sleep_minutes if s else None,
-            s.light_sleep_minutes if s else None, s.efficiency_percent if s else None,
-            s.hrv_average if s else None, s.lowest_heart_rate if s else None,
-            s.average_heart_rate if s else None, s.respiratory_rate if s else None,
-            s.bedtime if s else None, s.wake_time if s else None,
-            len(activities), total_activity_mins, total_distance, total_elevation,
-            avg_hr, max_hr, avg_power, total_suffer,
+            w.temp_avg_c if w else None, w.pressure_hpa if w else None,
+            w.humidity_percent if w else None,
+            entry.morning_notes, entry.evening_notes, entry.general_notes,
             entry.is_complete, datetime.now()
         ])
+    
+    def add_meal_with_nutrition(
+        self,
+        entry_date: date,
+        meal_type: str,
+        description: str,
+        nutrition: dict,
+        time_consumed: Optional[time] = None,
+        notes: Optional[str] = None,
+    ) -> str:
+        """Add a meal with nutritional information."""
+        import uuid
         
-        # Upsert activities
-        self.conn.execute("DELETE FROM activities WHERE entry_date = ?", [entry.entry_date])
-        for activity in activities:
-            activity_id = activity.activity_id or str(uuid.uuid4())
-            self.conn.execute("""
-                INSERT INTO activities VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, [
-                activity_id, entry.entry_date, activity.activity_type, activity.name,
-                activity.start_time, activity.duration_minutes, activity.distance_km,
-                activity.elevation_gain_m, activity.average_speed_kmh, activity.max_speed_kmh,
-                activity.average_heart_rate, activity.max_heart_rate,
-                activity.average_power_watts, activity.normalized_power_watts,
-                activity.average_cadence, activity.suffer_score, activity.description
-            ])
+        meal_id = str(uuid.uuid4())
         
-        # Upsert symptoms
-        self.conn.execute("DELETE FROM symptoms WHERE entry_date = ?", [entry.entry_date])
-        for symptom in entry.symptoms:
-            symptom_id = str(uuid.uuid4())
-            self.conn.execute("""
-                INSERT INTO symptoms VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, [
-                symptom_id, entry.entry_date, symptom.type.value, symptom.custom_type,
-                symptom.severity.value, symptom.location.value if symptom.location else None,
-                symptom.custom_location, symptom.onset_time, symptom.duration_minutes,
-                symptom.notes, datetime.now()
-            ])
+        self.conn.execute("""
+            INSERT INTO meals (
+                id, entry_date, meal_type, time_consumed, description,
+                calories, protein_g, carbs_g, fat_g, fiber_g, sugar_g, sodium_mg,
+                water_ml, caffeine_mg, contains_caffeine, contains_alcohol, alcohol_units,
+                nutrition_source, estimation_confidence, llm_reasoning, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, [
+            meal_id, entry_date, meal_type, time_consumed, description,
+            nutrition.get('calories'), nutrition.get('protein_g'), nutrition.get('carbs_g'),
+            nutrition.get('fat_g'), nutrition.get('fiber_g'), nutrition.get('sugar_g'),
+            nutrition.get('sodium_mg'), nutrition.get('water_ml'),
+            nutrition.get('caffeine_mg'), nutrition.get('caffeine_mg', 0) > 0,
+            nutrition.get('alcohol_units', 0) > 0, nutrition.get('alcohol_units'),
+            nutrition.get('source', 'estimated'), nutrition.get('confidence'),
+            nutrition.get('reasoning'), notes
+        ])
         
-        # Upsert incidents
-        self.conn.execute("DELETE FROM incidents WHERE entry_date = ?", [entry.entry_date])
-        for incident in entry.incidents:
-            incident_id = str(uuid.uuid4())
-            self.conn.execute("""
-                INSERT INTO incidents VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, [
-                incident_id, entry.entry_date, incident.type.value, incident.custom_type,
-                incident.location.value if incident.location else None, incident.custom_location,
-                incident.severity.value, incident.description, incident.time_occurred, datetime.now()
-            ])
-        
-        # Upsert meals
-        self.conn.execute("DELETE FROM meals WHERE entry_date = ?", [entry.entry_date])
-        for meal in entry.meals:
-            meal_id = str(uuid.uuid4())
-            self.conn.execute("""
-                INSERT INTO meals VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, [
-                meal_id, entry.entry_date, meal.meal_type.value, meal.description,
-                meal.time_consumed, meal.contains_alcohol, meal.alcohol_units,
-                meal.contains_caffeine, meal.trigger_foods, meal.notes, datetime.now()
-            ])
+        return meal_id
     
     def get_daily_summary_df(
         self,
@@ -322,22 +817,115 @@ class AnalyticsDB:
         
         return self.conn.execute(query, params).df()
     
-    def get_correlation_matrix(
+    def get_nutrition_summary(
         self,
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
     ) -> pd.DataFrame:
-        """Get correlation matrix between all numeric columns."""
-        df = self.get_daily_summary_df(start_date, end_date)
+        """Get daily nutrition totals."""
+        query = """
+            SELECT 
+                entry_date,
+                COUNT(*) as meal_count,
+                SUM(calories) as total_calories,
+                SUM(protein_g) as total_protein_g,
+                SUM(carbs_g) as total_carbs_g,
+                SUM(fat_g) as total_fat_g,
+                SUM(fiber_g) as total_fiber_g,
+                SUM(caffeine_mg) as total_caffeine_mg,
+                SUM(alcohol_units) as total_alcohol_units
+            FROM meals
+        """
+        conditions = []
+        params = []
         
-        # Select numeric columns
-        numeric_cols = df.select_dtypes(include=['number']).columns
+        if start_date:
+            conditions.append("entry_date >= ?")
+            params.append(start_date)
+        if end_date:
+            conditions.append("entry_date <= ?")
+            params.append(end_date)
         
-        return df[numeric_cols].corr()
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        
+        query += " GROUP BY entry_date ORDER BY entry_date"
+        
+        return self.conn.execute(query, params).df()
+    
+    def get_sleep_trends(
+        self,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> pd.DataFrame:
+        """Get sleep data trends."""
+        query = """
+            SELECT 
+                entry_date,
+                sleep_score,
+                total_sleep_minutes,
+                deep_sleep_minutes,
+                rem_sleep_minutes,
+                light_sleep_minutes,
+                efficiency_percent,
+                hrv_average,
+                lowest_heart_rate,
+                respiratory_rate
+            FROM sleep
+        """
+        conditions = []
+        params = []
+        
+        if start_date:
+            conditions.append("entry_date >= ?")
+            params.append(start_date)
+        if end_date:
+            conditions.append("entry_date <= ?")
+            params.append(end_date)
+        
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        
+        query += " ORDER BY entry_date"
+        
+        return self.conn.execute(query, params).df()
     
     def query(self, sql: str, params: list = None) -> pd.DataFrame:
         """Execute arbitrary SQL query and return DataFrame."""
         return self.conn.execute(sql, params or []).df()
+    
+    def get_table_info(self) -> pd.DataFrame:
+        """Get information about all tables."""
+        return self.query("""
+            SELECT table_name, column_name, data_type, is_nullable
+            FROM information_schema.columns
+            WHERE table_schema = 'main'
+            ORDER BY table_name, ordinal_position
+        """)
+    
+    def get_schema_summary(self) -> str:
+        """Get a human-readable summary of all tables and columns."""
+        tables = self.query("""
+            SELECT DISTINCT table_name 
+            FROM information_schema.columns 
+            WHERE table_schema = 'main'
+            ORDER BY table_name
+        """)
+        
+        result = []
+        for table_name in tables['table_name']:
+            cols = self.query(f"""
+                SELECT column_name, data_type
+                FROM information_schema.columns
+                WHERE table_schema = 'main' AND table_name = '{table_name}'
+                ORDER BY ordinal_position
+            """)
+            
+            result.append(f"\n=== {table_name.upper()} ===")
+            for _, row in cols.iterrows():
+                result.append(f"  {row['column_name']}: {row['data_type']}")
+        
+        return "\n".join(result)
     
     def close(self) -> None:
         """Close database connection."""

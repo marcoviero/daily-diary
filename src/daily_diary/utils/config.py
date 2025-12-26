@@ -31,8 +31,11 @@ class Settings(BaseSettings):
     oura_client_secret: Optional[str] = None # OAuth2
     oura_refresh_token: Optional[str] = None # OAuth2
     
-    # OpenAI (for Whisper transcription)
+    # OpenAI (for Whisper transcription and nutrition fallback)
     openai_api_key: Optional[str] = None
+    
+    # Anthropic (for nutrition estimation)
+    anthropic_api_key: Optional[str] = None
     
     # Location defaults (Portland, OR)
     default_latitude: float = Field(default=45.5152)
