@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+
+{% block title %}Analysis - Daily Health Diary{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold text-gray-800">📊 Health Analysis</h1>
+    <select onchange="window.location.href='/analysis/?days=' + this.value" 
+            class="border rounded px-3 py-2">
+        <option value="30" {% if days == 30 %}selected{% endif %}>Last 30 days</option>
+        <option value="60" {% if days == 60 %}selected{% endif %}>Last 60 days</option>
+        <option value="90" {% if days == 90 %}selected{% endif %}>Last 90 days</option>
+        <option value="180" {% if days == 180 %}selected{% endif %}>Last 6 months</option>
+        <option value="365" {% if days == 365 %}selected{% endif %}>Last year</option>
+    </select>
+</div>
+
+{% if summary.get('error') %}
+<div class="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center">
+    <div class="text-5xl mb-4">📭</div>
+    <h2 class="text-xl font-medium text-gray-700 mb-2">Not enough data yet</h2>
+    <p class="text-gray-500 mb-6">Start logging entries to see patterns and correlations</p>
+    <a href="/entries/new" class="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700">
+        Create Entry
+    </a>
+</div>
+{% else %}
+
+<!-- Summary Cards -->
+<div class="grid md:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white rounded-xl shadow p-6">
+        <div class="text-3xl font-bold text-indigo-600">{{ summary.period_days }}</div>
+        <div class="text-sm text-gray-500">Days Tracked</div>
+    </div>
+    <div class="bg-white rounded-xl shadow p-6">
+        <div class="text-3xl font-bold text-red-500">{{ (summary.symptom_rate * 100)|round|int }}%</div>
+        <div class="text-sm text-gray-500">Days with Symptoms</div>
+    </div>
+    <div class="bg-white rounded-xl shadow p-6">
+        <div class="text-3xl font-bold text-green-600">{{ summary.avg_wellbeing|round(1) if summary.avg_wellbeing else '-' }}</div>
+        <div class="text-sm text-gray-500">Avg Wellbeing</div>
+    </div>
+    <div class="bg-white rounded-xl shadow p-6">
+        <div class="text-3xl font-bold text-blue-600">{{ summary.avg_sleep_score|round|int if summary.avg_sleep_score else '-' }}</div>
+        <div class="text-sm text-gray-500">Avg Sleep Score</div>
+    </div>
+</div>
+
+<!-- Symptom Timeline Chart -->
+{% if chart_data.get('symptom_timeline') %}
+<div class="bg-white rounded-xl shadow p-6 mb-6">
+    <h2 class="text-xl font-semibold mb-4">Symptom Timeline</h2>
+    <div id="symptom-timeline" style="height: 300px;"></div>
+</div>
+{% endif %}
+
+<!-- Significant Correlations -->
+{% if significant_correlations %}
+<div class="bg-white rounded-xl shadow p-6 mb-6">
+    <h2 class="text-xl font-semibold mb-4">🔍 Significant Correlations</h2>
+    <p class="text-sm text-gray-500 mb-4">These factors show statistically significant relationships with your symptoms (p < 0.05)</p>
+    
+    <div class="space-y-4">
+        {% for corr in significant_correlations %}
+        <div class="border rounded-lg p-4 
+            {% if corr.correlation < 0 %}border-green-200 bg-green-50
+            {% else %}border-red-200 bg-red-50{% endif %}">
+            <div class="flex justify-between items-start">
+                <div>
+                    <span class="font-medium text-lg">{{ corr.factor }}</span>
+                    <span class="ml-2 text-sm px-2 py-1 rounded
+                        {% if corr.strength == 'strong' or corr.strength == 'very strong' %}bg-purple-100 text-purple-800
+                        {% elif corr.strength == 'moderate' %}bg-blue-100 text-blue-800
+                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                        {{ corr.strength }}
+                    </span>
+                </div>
+                <div class="text-right">
+                    <div class="font-mono text-lg 
+                        {% if corr.correlation < 0 %}text-green-600{% else %}text-red-600{% endif %}">
+                        r = {{ '%+.3f'|format(corr.correlation) }}
+                    </div>
+                    <div class="text-xs text-gray-500">p = {{ '%.4f'|format(corr.p_value) }}</div>
+                </div>
+            </div>
+            <p class="mt-2 text-gray-700">{{ corr.interpretation }}</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Patterns Detected -->
+{% if patterns %}
+<div class="bg-white rounded-xl shadow p-6 mb-6">
+    <h2 class="text-xl font-semibold mb-4">📅 Patterns Detected</h2>
+    <div class="space-y-3">
+        {% for pattern in patterns %}
+        <div class="p-4 bg-gray-50 rounded-lg">
+            <p class="text-gray-700">{{ pattern.description }}</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- All Correlations Table -->
+{% if correlations %}
+<div class="bg-white rounded-xl shadow p-6 mb-6">
+    <h2 class="text-xl font-semibold mb-4">All Correlations</h2>
+    <p class="text-sm text-gray-500 mb-4">Sorted by correlation strength. Green = protective, Red = risk factor.</p>
+    
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-2 text-left text-sm font-medium text-gray-500">Factor</th>
+                    <th class="px-4 py-2 text-center text-sm font-medium text-gray-500">Correlation (r)</th>
+                    <th class="px-4 py-2 text-center text-sm font-medium text-gray-500">Strength</th>
+                    <th class="px-4 py-2 text-center text-sm font-medium text-gray-500">p-value</th>
+                    <th class="px-4 py-2 text-center text-sm font-medium text-gray-500">Significant?</th>
+                    <th class="px-4 py-2 text-center text-sm font-medium text-gray-500">N</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for corr in correlations %}
+                <tr class="{% if corr.is_significant %}bg-yellow-50{% endif %}">
+                    <td class="px-4 py-3 font-medium">{{ corr.factor }}</td>
+                    <td class="px-4 py-3 text-center font-mono
+                        {% if corr.correlation < -0.1 %}text-green-600
+                        {% elif corr.correlation > 0.1 %}text-red-600
+                        {% else %}text-gray-500{% endif %}">
+                        {{ '%+.3f'|format(corr.correlation) }}
+                    </td>
+                    <td class="px-4 py-3 text-center text-sm">{{ corr.strength }}</td>
+                    <td class="px-4 py-3 text-center font-mono text-sm">{{ '%.4f'|format(corr.p_value) }}</td>
+                    <td class="px-4 py-3 text-center">
+                        {% if corr.is_significant %}
+                        <span class="text-green-500">✓</span>
+                        {% else %}
+                        <span class="text-gray-300">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-center text-sm text-gray-500">{{ corr.n_samples }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Scatter Plots -->
+<div class="grid md:grid-cols-2 gap-6 mb-6">
+    {% if chart_data.get('pressure_scatter') %}
+    <div class="bg-white rounded-xl shadow p-6">
+        <h3 class="text-lg font-semibold mb-4">Pressure vs Symptoms</h3>
+        <div id="pressure-scatter" style="height: 300px;"></div>
+    </div>
+    {% endif %}
+    
+    {% if chart_data.get('sleep_scatter') %}
+    <div class="bg-white rounded-xl shadow p-6">
+        <h3 class="text-lg font-semibold mb-4">Sleep vs Symptoms</h3>
+        <div id="sleep-scatter" style="height: 300px;"></div>
+    </div>
+    {% endif %}
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const chartData = {{ chart_data | tojson }};
+    
+    // Symptom Timeline
+    if (chartData.symptom_timeline) {
+        const timelineData = [
+            {
+                x: chartData.symptom_timeline.dates,
+                y: chartData.symptom_timeline.severity,
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'Symptom Severity',
+                line: { color: '#ef4444' },
+                marker: { size: 6 }
+            }
+        ];
+        
+        if (chartData.symptom_timeline.wellbeing && chartData.symptom_timeline.wellbeing.length > 0) {
+            timelineData.push({
+                x: chartData.symptom_timeline.dates,
+                y: chartData.symptom_timeline.wellbeing,
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'Wellbeing',
+                line: { color: '#22c55e' },
+                marker: { size: 6 },
+                yaxis: 'y2'
+            });
+        }
+        
+        Plotly.newPlot('symptom-timeline', timelineData, {
+            margin: { t: 20, r: 50 },
+            xaxis: { title: '' },
+            yaxis: { title: 'Symptom Severity', range: [0, 10] },
+            yaxis2: { title: 'Wellbeing', overlaying: 'y', side: 'right', range: [0, 10] },
+            legend: { x: 0, y: 1.1, orientation: 'h' }
+        }, { responsive: true });
+    }
+    
+    // Pressure Scatter
+    if (chartData.pressure_scatter) {
+        Plotly.newPlot('pressure-scatter', [{
+            x: chartData.pressure_scatter.pressure,
+            y: chartData.pressure_scatter.severity,
+            mode: 'markers',
+            type: 'scatter',
+            marker: { size: 10, color: '#6366f1' },
+            text: chartData.pressure_scatter.dates,
+            hovertemplate: '%{text}<br>Pressure: %{x} hPa<br>Severity: %{y}<extra></extra>'
+        }], {
+            margin: { t: 20 },
+            xaxis: { title: 'Barometric Pressure (hPa)' },
+            yaxis: { title: 'Symptom Severity', range: [0, 10] }
+        }, { responsive: true });
+    }
+    
+    // Sleep Scatter
+    if (chartData.sleep_scatter) {
+        Plotly.newPlot('sleep-scatter', [{
+            x: chartData.sleep_scatter.sleep_score,
+            y: chartData.sleep_scatter.severity,
+            mode: 'markers',
+            type: 'scatter',
+            marker: { size: 10, color: '#22c55e' }
+        }], {
+            margin: { t: 20 },
+            xaxis: { title: 'Sleep Score' },
+            yaxis: { title: 'Symptom Severity', range: [0, 10] }
+        }, { responsive: true });
+    }
+</script>
+{% endblock %}
