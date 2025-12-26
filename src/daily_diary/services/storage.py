@@ -15,11 +15,14 @@ class DiaryStorage:
     Local storage for diary entries using TinyDB.
     
     Data is stored as JSON in the data directory.
+    Also syncs to DuckDB analytics database for fast queries.
     """
     
-    def __init__(self, settings: Optional[Settings] = None):
+    def __init__(self, settings: Optional[Settings] = None, sync_analytics: bool = True):
         self.settings = settings or get_settings()
         self._db: Optional[TinyDB] = None
+        self._analytics_db = None
+        self._sync_analytics = sync_analytics
     
     @property
     def db_path(self) -> Path:
@@ -33,6 +36,14 @@ class DiaryStorage:
         if self._db is None:
             self._db = TinyDB(self.db_path)
         return self._db
+    
+    @property
+    def analytics(self):
+        """Get the DuckDB analytics database."""
+        if self._analytics_db is None and self._sync_analytics:
+            from .database import AnalyticsDB
+            self._analytics_db = AnalyticsDB()
+        return self._analytics_db
     
     def save_entry(self, entry: DiaryEntry) -> None:
         """Save or update a diary entry."""
@@ -48,6 +59,10 @@ class DiaryStorage:
             self.db.update(entry_dict, Entry.entry_date == entry.entry_date.isoformat())
         else:
             self.db.insert(entry_dict)
+        
+        # Sync to analytics database
+        if self.analytics:
+            self.analytics.upsert_entry(entry)
     
     def get_entry(self, entry_date: date) -> Optional[DiaryEntry]:
         """Get an entry by date."""
@@ -133,10 +148,13 @@ class DiaryStorage:
         return len(removed) > 0
     
     def close(self) -> None:
-        """Close the database connection."""
+        """Close the database connections."""
         if self._db:
             self._db.close()
             self._db = None
+        if self._analytics_db:
+            self._analytics_db.close()
+            self._analytics_db = None
     
     def __enter__(self) -> "DiaryStorage":
         return self

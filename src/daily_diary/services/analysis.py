@@ -156,7 +156,7 @@ class AnalysisService:
                 'temp_low_c': w.temp_low_c,
                 'pressure_hpa': w.pressure_hpa,
                 'humidity_percent': w.humidity_percent,
-                'wind_speed_mph': w.wind_speed_mph,
+                'wind_speed_kmh': w.wind_speed_kmh,
             })
         
         # Activity

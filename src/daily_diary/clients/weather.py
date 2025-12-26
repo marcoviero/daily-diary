@@ -60,7 +60,7 @@ class WeatherClient:
                 pressure_hpa=data["main"]["pressure"],
                 humidity_percent=data["main"]["humidity"],
                 description=data["weather"][0]["description"] if data.get("weather") else None,
-                wind_speed_mph=data["wind"]["speed"] if data.get("wind") else None,
+                wind_speed_kmh=data["wind"]["speed"] * 3.6 if data.get("wind") else None,
                 location=data.get("name"),
                 fetched_at=datetime.now(),
             )

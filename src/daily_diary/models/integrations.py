@@ -24,7 +24,7 @@ class WeatherData(BaseModel):
     # Conditions
     description: Optional[str] = None  # e.g., "partly cloudy"
     precipitation_mm: Optional[float] = None
-    wind_speed_mph: Optional[float] = None
+    wind_speed_kmh: Optional[float] = None
     
     # UV index
     uv_index: Optional[int] = None

@@ -25,102 +25,134 @@
         <h2 class="text-lg font-semibold text-blue-800 mb-4">📡 Auto-collected Data</h2>
         <div class="grid md:grid-cols-3 gap-4">
             {% if entry.integrations.weather %}
-            <div class="bg-white rounded-lg p-4 shadow-sm">
-                <h3 class="font-medium text-gray-700 mb-2">🌤️ Weather</h3>
-                <p class="text-2xl font-bold">{{ entry.integrations.weather.temp_avg_c|round|int }}°C</p>
-                {% if entry.integrations.weather.description %}
-                <p class="text-sm text-gray-600 capitalize">{{ entry.integrations.weather.description }}</p>
-                {% endif %}
-                <div class="mt-2 text-sm text-gray-500 space-y-1">
-                    {% if entry.integrations.weather.temp_high_c and entry.integrations.weather.temp_low_c %}
-                    <p>↑ {{ entry.integrations.weather.temp_high_c|round|int }}°C / ↓ {{ entry.integrations.weather.temp_low_c|round|int }}°C</p>
-                    {% endif %}
-                    {% if entry.integrations.weather.pressure_hpa %}
-                    <p>Pressure: <strong>{{ entry.integrations.weather.pressure_hpa|round|int }}</strong> hPa</p>
-                    {% endif %}
-                    {% if entry.integrations.weather.humidity_percent %}
-                    <p>Humidity: {{ entry.integrations.weather.humidity_percent }}%</p>
-                    {% endif %}
-                    {% if entry.integrations.weather.wind_speed_mph %}
-                    <p>Wind: {{ entry.integrations.weather.wind_speed_mph|round(1) }} km/h</p>
-                    {% endif %}
+            <div class="bg-white rounded-lg shadow-sm cursor-pointer transition-all hover:shadow-md" onclick="toggleDetails(this)">
+                <div class="p-4">
+                    <h3 class="font-medium text-gray-700 mb-2">🌤️ Weather</h3>
+                    <!-- Summary -->
+                    <div class="summary">
+                        <p class="text-2xl font-bold">{{ entry.integrations.weather.temp_avg_c|round|int }}°C</p>
+                        {% if entry.integrations.weather.description %}
+                        <p class="text-sm text-gray-600 capitalize">{{ entry.integrations.weather.description }}</p>
+                        {% endif %}
+                        <p class="text-sm text-gray-500">{{ entry.integrations.weather.pressure_hpa|round|int }} hPa</p>
+                        <p class="text-xs text-blue-500 mt-2">Click for details ▼</p>
+                    </div>
+                    <!-- Details -->
+                    <div class="details hidden mt-3 pt-3 border-t text-sm text-gray-500 space-y-1">
+                        {% if entry.integrations.weather.temp_high_c and entry.integrations.weather.temp_low_c %}
+                        <p>↑ {{ entry.integrations.weather.temp_high_c|round|int }}°C / ↓ {{ entry.integrations.weather.temp_low_c|round|int }}°C</p>
+                        {% endif %}
+                        {% if entry.integrations.weather.humidity_percent %}
+                        <p>Humidity: {{ entry.integrations.weather.humidity_percent }}%</p>
+                        {% endif %}
+                        {% if entry.integrations.weather.wind_speed_kmh %}
+                        <p>Wind: {{ entry.integrations.weather.wind_speed_kmh|round(1) }} km/h</p>
+                        {% endif %}
+                        <p class="text-xs text-blue-500 mt-2">Click to collapse ▲</p>
+                    </div>
                 </div>
             </div>
             {% endif %}
             
             {% if entry.integrations.activities %}
-            <div class="bg-white rounded-lg p-4 shadow-sm">
-                <h3 class="font-medium text-gray-700 mb-2">🚴 Activities</h3>
-                {% for activity in entry.integrations.activities %}
-                <div class="{% if not loop.first %}mt-3 pt-3 border-t{% endif %}">
-                    <p class="font-medium text-gray-800">{{ activity.name or activity.activity_type }}</p>
-                    <div class="text-sm text-gray-500 space-y-1 mt-1">
-                        <p>
-                            <strong>{{ activity.duration_minutes|round|int }}</strong> min
-                            {% if activity.distance_km %} · <strong>{{ activity.distance_km|round(1) }}</strong> km{% endif %}
-                            {% if activity.elevation_gain_m %} · <strong>{{ activity.elevation_gain_m|round|int }}</strong>m ↑{% endif %}
+            <div class="bg-white rounded-lg shadow-sm cursor-pointer transition-all hover:shadow-md" onclick="toggleDetails(this)">
+                <div class="p-4">
+                    <h3 class="font-medium text-gray-700 mb-2">🚴 Activities</h3>
+                    <!-- Summary -->
+                    <div class="summary">
+                        <p class="text-2xl font-bold">{{ entry.integrations.total_activity_minutes|round|int }} min</p>
+                        <p class="text-sm text-gray-600">
+                            {{ entry.integrations.activities|length }} activit{{ 'y' if entry.integrations.activities|length == 1 else 'ies' }}
+                            {% if entry.integrations.total_elevation_gain %}· {{ entry.integrations.total_elevation_gain|round|int }}m ↑{% endif %}
                         </p>
-                        {% if activity.average_speed_kmh %}
-                        <p>Avg speed: {{ activity.average_speed_kmh|round(1) }} km/h</p>
-                        {% endif %}
-                        {% if activity.average_heart_rate %}
-                        <p>❤️ {{ activity.average_heart_rate|round|int }} bpm avg{% if activity.max_heart_rate %} / {{ activity.max_heart_rate|round|int }} max{% endif %}</p>
-                        {% endif %}
-                        {% if activity.average_power_watts %}
-                        <p>⚡ {{ activity.average_power_watts|round|int }}W avg{% if activity.normalized_power_watts %} / {{ activity.normalized_power_watts|round|int }}W NP{% endif %}</p>
-                        {% endif %}
-                        {% if activity.average_cadence %}
-                        <p>Cadence: {{ activity.average_cadence|round|int }} rpm</p>
-                        {% endif %}
-                        {% if activity.suffer_score %}
-                        <p>Relative Effort: {{ activity.suffer_score|round|int }}</p>
-                        {% endif %}
+                        <p class="text-xs text-blue-500 mt-2">Click for details ▼</p>
+                    </div>
+                    <!-- Details -->
+                    <div class="details hidden mt-3 pt-3 border-t">
+                        {% for activity in entry.integrations.activities %}
+                        <div class="{% if not loop.first %}mt-3 pt-3 border-t{% endif %}">
+                            <p class="font-medium text-gray-800">{{ activity.name or activity.activity_type }}</p>
+                            <div class="text-sm text-gray-500 space-y-1 mt-1">
+                                <p>
+                                    <strong>{{ activity.duration_minutes|round|int }}</strong> min
+                                    {% if activity.distance_km %} · <strong>{{ activity.distance_km|round(1) }}</strong> km{% endif %}
+                                    {% if activity.elevation_gain_m %} · <strong>{{ activity.elevation_gain_m|round|int }}</strong>m ↑{% endif %}
+                                </p>
+                                {% if activity.average_heart_rate %}
+                                <p>❤️ {{ activity.average_heart_rate|round|int }} bpm avg{% if activity.max_heart_rate %} / {{ activity.max_heart_rate|round|int }} max{% endif %}</p>
+                                {% endif %}
+                                {% if activity.average_power_watts %}
+                                <p>⚡ {{ activity.average_power_watts|round|int }}W avg</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                        <p class="text-xs text-blue-500 mt-2">Click to collapse ▲</p>
                     </div>
                 </div>
-                {% endfor %}
             </div>
             {% endif %}
             
             {% if entry.integrations.sleep %}
-            <div class="bg-white rounded-lg p-4 shadow-sm">
-                <h3 class="font-medium text-gray-700 mb-2">😴 Sleep</h3>
-                <p class="text-2xl font-bold">{{ entry.integrations.sleep.sleep_score or 'N/A' }}</p>
-                <p class="text-sm text-gray-600">
-                    {{ (entry.integrations.sleep.total_sleep_minutes or 0) // 60 }}h 
-                    {{ (entry.integrations.sleep.total_sleep_minutes or 0) % 60 }}m total
-                </p>
-                <div class="mt-2 text-sm text-gray-500 space-y-1">
-                    {% if entry.integrations.sleep.deep_sleep_minutes %}
-                    <p>🟦 Deep: {{ entry.integrations.sleep.deep_sleep_minutes }} min ({{ ((entry.integrations.sleep.deep_sleep_minutes or 0) / (entry.integrations.sleep.total_sleep_minutes or 1) * 100)|round|int }}%)</p>
-                    {% endif %}
-                    {% if entry.integrations.sleep.rem_sleep_minutes %}
-                    <p>🟪 REM: {{ entry.integrations.sleep.rem_sleep_minutes }} min ({{ ((entry.integrations.sleep.rem_sleep_minutes or 0) / (entry.integrations.sleep.total_sleep_minutes or 1) * 100)|round|int }}%)</p>
-                    {% endif %}
-                    {% if entry.integrations.sleep.light_sleep_minutes %}
-                    <p>🟩 Light: {{ entry.integrations.sleep.light_sleep_minutes }} min ({{ ((entry.integrations.sleep.light_sleep_minutes or 0) / (entry.integrations.sleep.total_sleep_minutes or 1) * 100)|round|int }}%)</p>
-                    {% endif %}
-                    {% if entry.integrations.sleep.efficiency_percent %}
-                    <p>Efficiency: {{ entry.integrations.sleep.efficiency_percent }}%</p>
-                    {% endif %}
-                    {% if entry.integrations.sleep.hrv_average %}
-                    <p>HRV: <strong>{{ entry.integrations.sleep.hrv_average|round|int }}</strong> ms</p>
-                    {% endif %}
-                    {% if entry.integrations.sleep.lowest_heart_rate %}
-                    <p>❤️ {{ entry.integrations.sleep.lowest_heart_rate|round|int }} bpm lowest{% if entry.integrations.sleep.average_heart_rate %} / {{ entry.integrations.sleep.average_heart_rate|round|int }} avg{% endif %}</p>
-                    {% endif %}
-                    {% if entry.integrations.sleep.respiratory_rate %}
-                    <p>Breathing: {{ entry.integrations.sleep.respiratory_rate|round(1) }}/min</p>
-                    {% endif %}
-                    {% if entry.integrations.sleep.bedtime and entry.integrations.sleep.wake_time %}
-                    <p class="text-xs text-gray-400 mt-2">
-                        🛏️ {{ entry.integrations.sleep.bedtime.strftime('%H:%M') }} → {{ entry.integrations.sleep.wake_time.strftime('%H:%M') }}
-                    </p>
-                    {% endif %}
+            <div class="bg-white rounded-lg shadow-sm cursor-pointer transition-all hover:shadow-md" onclick="toggleDetails(this)">
+                <div class="p-4">
+                    <h3 class="font-medium text-gray-700 mb-2">😴 Sleep</h3>
+                    <!-- Summary -->
+                    <div class="summary">
+                        <p class="text-2xl font-bold">{{ entry.integrations.sleep.sleep_score or 'N/A' }}</p>
+                        <p class="text-sm text-gray-600">
+                            {{ (entry.integrations.sleep.total_sleep_minutes or 0) // 60 }}h 
+                            {{ (entry.integrations.sleep.total_sleep_minutes or 0) % 60 }}m total
+                        </p>
+                        {% if entry.integrations.sleep.hrv_average %}
+                        <p class="text-sm text-gray-500">HRV: {{ entry.integrations.sleep.hrv_average|round|int }} ms</p>
+                        {% endif %}
+                        <p class="text-xs text-blue-500 mt-2">Click for details ▼</p>
+                    </div>
+                    <!-- Details -->
+                    <div class="details hidden mt-3 pt-3 border-t text-sm text-gray-500 space-y-1">
+                        {% if entry.integrations.sleep.deep_sleep_minutes %}
+                        <p>🟦 Deep: {{ entry.integrations.sleep.deep_sleep_minutes }} min</p>
+                        {% endif %}
+                        {% if entry.integrations.sleep.rem_sleep_minutes %}
+                        <p>🟪 REM: {{ entry.integrations.sleep.rem_sleep_minutes }} min</p>
+                        {% endif %}
+                        {% if entry.integrations.sleep.light_sleep_minutes %}
+                        <p>🟩 Light: {{ entry.integrations.sleep.light_sleep_minutes }} min</p>
+                        {% endif %}
+                        {% if entry.integrations.sleep.efficiency_percent %}
+                        <p>Efficiency: {{ entry.integrations.sleep.efficiency_percent }}%</p>
+                        {% endif %}
+                        {% if entry.integrations.sleep.lowest_heart_rate %}
+                        <p>❤️ {{ entry.integrations.sleep.lowest_heart_rate|round|int }} bpm lowest</p>
+                        {% endif %}
+                        {% if entry.integrations.sleep.bedtime and entry.integrations.sleep.wake_time %}
+                        <p class="text-xs text-gray-400">
+                            🛏️ {{ entry.integrations.sleep.bedtime.strftime('%H:%M') }} → {{ entry.integrations.sleep.wake_time.strftime('%H:%M') }}
+                        </p>
+                        {% endif %}
+                        <p class="text-xs text-blue-500 mt-2">Click to collapse ▲</p>
+                    </div>
                 </div>
             </div>
             {% endif %}
         </div>
     </div>
+    
+    <script>
+    function toggleDetails(element) {
+        const summary = element.querySelector('.summary');
+        const details = element.querySelector('.details');
+        
+        if (details.classList.contains('hidden')) {
+            details.classList.remove('hidden');
+            summary.querySelector('.text-blue-500').textContent = 'Click to collapse ▲';
+        } else {
+            details.classList.add('hidden');
+            summary.querySelector('.text-blue-500').textContent = 'Click for details ▼';
+        }
+    }
+    </script>
     {% endif %}
     
     <!-- Daily Assessment -->

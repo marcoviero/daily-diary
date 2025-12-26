@@ -9,6 +9,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from .models.entry import DiaryEntry
 from .services import DiaryPrompter, DiaryStorage, TranscriptionService
 
 app = typer.Typer(
@@ -346,6 +347,104 @@ def fetch(
         
         storage.save_entry(entry)
         console.print(f"\n[green]✓ Entry updated for {entry_date}[/green]")
+
+
+@app.command()
+def sync_db():
+    """Sync all diary entries to the analytics database."""
+    from .services.database import AnalyticsDB
+    
+    console.print("Syncing entries to analytics database...")
+    
+    with DiaryStorage(sync_analytics=False) as storage:
+        entries = storage.db.all()
+        
+        with AnalyticsDB() as analytics:
+            for entry_dict in entries:
+                entry = DiaryEntry.model_validate(entry_dict)
+                analytics.upsert_entry(entry)
+                console.print(f"  ✓ {entry.entry_date}")
+    
+    console.print(f"\n[green]✓ Synced {len(entries)} entries to analytics.duckdb[/green]")
+
+
+@app.command()
+def query(
+    sql: str = typer.Argument(..., help="SQL query to run against analytics database"),
+):
+    """Run a SQL query against the analytics database."""
+    from .services.database import AnalyticsDB
+    
+    with AnalyticsDB() as analytics:
+        try:
+            df = analytics.query(sql)
+            console.print(df.to_string())
+        except Exception as e:
+            console.print(f"[red]Query error: {e}[/red]")
+
+
+@app.command()
+def correlations(
+    days: int = typer.Option(90, "--days", "-n", help="Number of days to analyze"),
+):
+    """Show correlation analysis from analytics database."""
+    import pandas as pd
+    from .services.database import AnalyticsDB
+    from datetime import timedelta
+    
+    end_date = date.today()
+    start_date = end_date - timedelta(days=days)
+    
+    with AnalyticsDB() as analytics:
+        df = analytics.get_daily_summary_df(start_date, end_date)
+        
+        if df.empty:
+            console.print("[yellow]No data in analytics database. Run 'diary sync-db' first.[/yellow]")
+            return
+        
+        console.print(f"\n[bold]Data from {start_date} to {end_date} ({len(df)} days)[/bold]\n")
+        
+        # Key correlations with symptoms
+        if 'worst_symptom_severity' in df.columns:
+            target = 'worst_symptom_severity'
+            correlations = []
+            
+            factors = [
+                ('pressure_hpa', 'Pressure'),
+                ('sleep_score', 'Sleep Score'),
+                ('hrv_average', 'HRV'),
+                ('total_sleep_minutes', 'Sleep Duration'),
+                ('total_activity_minutes', 'Activity'),
+                ('alcohol_units', 'Alcohol'),
+                ('temp_avg_c', 'Temperature'),
+            ]
+            
+            for col, name in factors:
+                if col in df.columns and df[col].notna().sum() >= 5:
+                    corr = df[target].corr(df[col])
+                    if not pd.isna(corr):
+                        correlations.append((name, corr))
+            
+            correlations.sort(key=lambda x: abs(x[1]), reverse=True)
+            
+            table = Table(title=f"Correlations with Symptom Severity (last {days} days)")
+            table.add_column("Factor", style="cyan")
+            table.add_column("Correlation", justify="right")
+            table.add_column("Interpretation", style="dim")
+            
+            for name, corr in correlations:
+                color = "green" if corr < 0 else "red"
+                interp = "protective" if corr < 0 else "risk factor"
+                strength = "weak" if abs(corr) < 0.3 else "moderate" if abs(corr) < 0.5 else "strong"
+                table.add_row(
+                    name,
+                    f"[{color}]{corr:+.3f}[/{color}]",
+                    f"{strength} {interp}",
+                )
+            
+            console.print(table)
+        else:
+            console.print("[yellow]No symptom data found for correlation analysis.[/yellow]")
 
 
 if __name__ == "__main__":
