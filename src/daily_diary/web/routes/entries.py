@@ -35,6 +35,55 @@ def get_storage() -> DiaryStorage:
     return DiaryStorage()
 
 
+def _sync_quick_log_meds(entry, routines_service):
+    """Sync medicine/supplement quick_log items to medications/supplements lists."""
+    from ...models.health import Medication, Supplement
+    
+    # Get the medicine_supplements category config
+    categories = routines_service.get_categories()
+    med_supp_category = None
+    for cat in categories:
+        if cat.get('id') == 'medicine_supplements':
+            med_supp_category = cat
+            break
+    
+    if not med_supp_category:
+        return
+    
+    # Known medications vs supplements
+    medication_ids = {'fingolimod'}  # Add more as needed
+    supplement_ids = {'vitamin_d', 'magnesium'}  # Add more as needed
+    
+    # Remove existing quick_log-sourced meds/supps (identified by not having detailed info)
+    # We'll re-add based on current quick_log counts
+    entry.medications = [m for m in entry.medications if m.reason or m.form]
+    entry.supplements = [s for s in entry.supplements if s.notes]
+    
+    # Add items based on quick_log counts
+    for item in med_supp_category.get('items', []):
+        item_id = item.get('id')
+        count = entry.quick_log.get(item_id, 0)
+        
+        if count > 0:
+            name = item.get('name')
+            dosage = item.get('dosage', '')
+            
+            if item_id in medication_ids:
+                # Add as medication
+                for _ in range(int(count)):
+                    entry.medications.append(Medication(
+                        name=name,
+                        dosage=dosage,
+                    ))
+            else:
+                # Default to supplement
+                for _ in range(int(count)):
+                    entry.supplements.append(Supplement(
+                        name=name,
+                        dosage=dosage,
+                    ))
+
+
 @router.get("/", response_class=HTMLResponse)
 async def list_entries(
     request: Request,
@@ -137,6 +186,9 @@ async def new_entry_form(
         entry.quick_log = routines_service.get_default_counts()
     
     quick_log_totals = routines_service.calculate_totals(entry.quick_log)
+    
+    # Sync medicine/supplements from quick_log to medications/supplements lists
+    _sync_quick_log_meds(entry, routines_service)
     
     # Build previous day defaults for assessment
     prev_defaults = {
@@ -653,6 +705,7 @@ async def update_quick_log(
     Can update a single item count, reset to defaults, or clear all.
     """
     from ...services.routines import RoutinesService
+    from ...models.health import Medication, Supplement
     
     target_date = datetime.strptime(entry_date, "%Y-%m-%d").date()
     routines_service = RoutinesService()
@@ -674,6 +727,9 @@ async def update_quick_log(
             elif item_id and count is not None:
                 # Update single item
                 entry.quick_log[item_id] = max(0, count)
+            
+            # Sync medicine/supplements from quick_log to medications/supplements lists
+            _sync_quick_log_meds(entry, routines_service)
             
             entry.updated_at = datetime.now()
             storage.save_entry(entry)
