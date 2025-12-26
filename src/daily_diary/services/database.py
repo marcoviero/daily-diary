@@ -705,20 +705,8 @@ class AnalyticsDB:
             ])
         
         # ===== MEALS =====
-        self.conn.execute("DELETE FROM meals WHERE entry_date = ?", [entry_date])
-        for meal in entry.meals:
-            meal_id = str(uuid.uuid4())
-            self.conn.execute("""
-                INSERT INTO meals (
-                    id, entry_date, meal_type, time_consumed, description,
-                    contains_alcohol, alcohol_units, contains_caffeine,
-                    trigger_foods, notes, nutrition_source
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, [
-                meal_id, entry_date, meal.meal_type.value, meal.time_consumed,
-                meal.description, meal.contains_alcohol, meal.alcohol_units,
-                meal.contains_caffeine, meal.trigger_foods, meal.notes, 'manual'
-            ])
+        # Meals are now managed separately via add_meal_with_nutrition
+        # Don't delete or re-insert them here to avoid conflicts
         
         # ===== SYMPTOMS =====
         self.conn.execute("DELETE FROM symptoms WHERE entry_date = ?", [entry_date])
@@ -809,6 +797,9 @@ class AnalyticsDB:
             entry.morning_notes, entry.evening_notes, entry.general_notes,
             entry.is_complete, datetime.now()
         ])
+        
+        # Ensure data is persisted
+        self.conn.execute("CHECKPOINT")
     
     def add_meal_with_nutrition(
         self,
@@ -841,6 +832,9 @@ class AnalyticsDB:
             nutrition.get('source', 'estimated'), nutrition.get('confidence'),
             nutrition.get('reasoning'), notes
         ])
+        
+        # Ensure data is persisted
+        self.conn.execute("CHECKPOINT")
         
         return meal_id
     

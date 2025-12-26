@@ -19,42 +19,31 @@
     
     <!-- Weekly Averages Summary -->
     {% if weekly_avg %}
-    <div class="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-6 mb-6">
-        <h2 class="text-lg font-semibold text-gray-700 mb-4">📊 Daily Averages ({{ days }} days)</h2>
-        <div class="grid grid-cols-4 gap-6">
-            <div class="text-center">
-                <p class="text-3xl font-bold text-orange-600">{{ weekly_avg.calories|round|int }}</p>
-                <p class="text-sm text-gray-600">Calories</p>
-            </div>
-            <div class="text-center">
-                <p class="text-3xl font-bold text-red-600">{{ weekly_avg.protein_g|round|int }}g</p>
-                <p class="text-sm text-gray-600">Protein</p>
-            </div>
-            <div class="text-center">
-                <p class="text-3xl font-bold text-yellow-600">{{ weekly_avg.carbs_g|round|int }}g</p>
-                <p class="text-sm text-gray-600">Carbs</p>
-            </div>
-            <div class="text-center">
-                <p class="text-3xl font-bold text-blue-600">{{ weekly_avg.fat_g|round|int }}g</p>
-                <p class="text-sm text-gray-600">Fat</p>
+    <div class="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-4 mb-6">
+        <div class="flex items-center justify-between">
+            <span class="text-sm font-medium text-gray-600">Daily Averages ({{ days }}d):</span>
+            <div class="flex space-x-6 text-sm">
+                <span><strong class="text-orange-600">{{ weekly_avg.calories|round|int }}</strong> cal</span>
+                <span><strong class="text-red-600">{{ weekly_avg.protein_g|round|int }}g</strong> protein</span>
+                <span><strong class="text-yellow-600">{{ weekly_avg.carbs_g|round|int }}g</strong> carbs</span>
+                <span><strong class="text-blue-600">{{ weekly_avg.fat_g|round|int }}g</strong> fat</span>
             </div>
         </div>
     </div>
     {% endif %}
     
     <!-- Quick Add Meal -->
-    <div class="bg-white rounded-xl shadow p-6 mb-6">
-        <h2 class="text-lg font-semibold text-gray-700 mb-4">➕ Quick Add Meal</h2>
-        <form action="/meals/quick-add" method="post" class="flex flex-wrap gap-4 items-end">
+    <div class="bg-white rounded-xl shadow p-4 mb-6">
+        <form action="/meals/quick-add" method="post" class="flex flex-wrap gap-3 items-end">
             <div class="flex-grow min-w-64">
-                <label class="block text-sm font-medium text-gray-700 mb-1">What did you eat?</label>
+                <label class="block text-xs font-medium text-gray-600 mb-1">What did you eat?</label>
                 <input type="text" name="description" required
-                       class="w-full border rounded px-3 py-2"
+                       class="w-full border rounded px-3 py-2 text-sm"
                        placeholder="e.g., Chicken salad with olive oil dressing">
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                <select name="meal_type" class="border rounded px-3 py-2">
+                <label class="block text-xs font-medium text-gray-600 mb-1">Type</label>
+                <select name="meal_type" class="border rounded px-3 py-2 text-sm">
                     <option value="breakfast">Breakfast</option>
                     <option value="lunch">Lunch</option>
                     <option value="dinner">Dinner</option>
@@ -62,104 +51,103 @@
                 </select>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Date</label>
                 <input type="date" name="entry_date" value="{{ end_date }}"
-                       class="border rounded px-3 py-2">
+                       class="border rounded px-3 py-2 text-sm">
             </div>
-            <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">
-                Add & Estimate
+            <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm">
+                Add
             </button>
         </form>
     </div>
     
-    <!-- Meals by Date -->
+    <!-- Meals Table -->
     {% if meals_by_date %}
-        {% for entry_date, meals in meals_by_date.items() %}
-        <div class="bg-white rounded-xl shadow mb-4 overflow-hidden">
-            <!-- Date Header with Totals -->
-            <div class="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
-                <div>
-                    <h3 class="font-bold text-lg text-gray-800">
-                        {{ entry_date.strftime('%A, %B %d') if entry_date.strftime else entry_date }}
-                    </h3>
-                    <p class="text-sm text-gray-500">{{ meals|length }} meal{% if meals|length != 1 %}s{% endif %}</p>
-                </div>
-                {% if daily_totals.get(entry_date) %}
-                {% set totals = daily_totals[entry_date] %}
-                <div class="flex space-x-6 text-sm">
-                    <div class="text-center">
-                        <p class="font-bold text-orange-600">{{ totals.calories|round|int }}</p>
-                        <p class="text-gray-500">cal</p>
-                    </div>
-                    <div class="text-center">
-                        <p class="font-bold text-red-600">{{ totals.protein_g|round|int }}g</p>
-                        <p class="text-gray-500">protein</p>
-                    </div>
-                    <div class="text-center">
-                        <p class="font-bold text-yellow-600">{{ totals.carbs_g|round|int }}g</p>
-                        <p class="text-gray-500">carbs</p>
-                    </div>
-                    <div class="text-center">
-                        <p class="font-bold text-blue-600">{{ totals.fat_g|round|int }}g</p>
-                        <p class="text-gray-500">fat</p>
-                    </div>
-                    {% if totals.caffeine_mg > 0 %}
-                    <div class="text-center">
-                        <p class="font-bold text-amber-600">{{ totals.caffeine_mg|round|int }}mg</p>
-                        <p class="text-gray-500">caffeine</p>
-                    </div>
+    <div class="bg-white rounded-xl shadow overflow-hidden">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-left">
+                <tr>
+                    <th class="px-4 py-3 font-medium text-gray-600">Date</th>
+                    <th class="px-4 py-3 font-medium text-gray-600">Time</th>
+                    <th class="px-4 py-3 font-medium text-gray-600">Type</th>
+                    <th class="px-4 py-3 font-medium text-gray-600">Description</th>
+                    <th class="px-4 py-3 font-medium text-gray-600 text-right">Cal</th>
+                    <th class="px-4 py-3 font-medium text-gray-600 text-right">P</th>
+                    <th class="px-4 py-3 font-medium text-gray-600 text-right">C</th>
+                    <th class="px-4 py-3 font-medium text-gray-600 text-right">F</th>
+                    <th class="px-4 py-3 font-medium text-gray-600 w-10"></th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for entry_date, meals in meals_by_date.items() %}
+                    <!-- Daily total row -->
+                    {% if daily_totals.get(entry_date) %}
+                    {% set totals = daily_totals[entry_date] %}
+                    <tr class="bg-gray-50 font-medium">
+                        <td class="px-4 py-2">
+                            {{ entry_date.strftime('%a %m/%d') if entry_date.strftime else entry_date }}
+                        </td>
+                        <td class="px-4 py-2 text-gray-400">—</td>
+                        <td class="px-4 py-2 text-gray-500" colspan="2">
+                            Daily Total ({{ meals|length }} meal{% if meals|length != 1 %}s{% endif %})
+                        </td>
+                        <td class="px-4 py-2 text-right text-orange-600">{{ totals.calories|round|int }}</td>
+                        <td class="px-4 py-2 text-right text-red-600">{{ totals.protein_g|round|int }}g</td>
+                        <td class="px-4 py-2 text-right text-yellow-600">{{ totals.carbs_g|round|int }}g</td>
+                        <td class="px-4 py-2 text-right text-blue-600">{{ totals.fat_g|round|int }}g</td>
+                        <td class="px-4 py-2"></td>
+                    </tr>
                     {% endif %}
-                    {% if totals.alcohol_units > 0 %}
-                    <div class="text-center">
-                        <p class="font-bold text-purple-600">{{ totals.alcohol_units|round(1) }}</p>
-                        <p class="text-gray-500">drinks</p>
-                    </div>
-                    {% endif %}
-                </div>
-                {% endif %}
-            </div>
-            
-            <!-- Individual Meals -->
-            <div class="divide-y">
-                {% for meal in meals %}
-                <div class="px-6 py-4 hover:bg-gray-50">
-                    <div class="flex justify-between items-start">
-                        <div class="flex-grow">
-                            <div class="flex items-center space-x-3">
-                                <span class="text-lg">
-                                    {% if meal.meal_type == 'breakfast' %}🌅
-                                    {% elif meal.meal_type == 'lunch' %}☀️
-                                    {% elif meal.meal_type == 'dinner' %}🌙
-                                    {% elif meal.meal_type == 'beverage' %}🥤
-                                    {% else %}🍿{% endif %}
-                                </span>
-                                <span class="font-medium text-gray-800 capitalize">{{ meal.meal_type }}</span>
-                                {% if meal.time_consumed %}
-                                <span class="text-sm text-gray-500">{{ meal.time_consumed }}</span>
-                                {% endif %}
-                            </div>
-                            <p class="text-gray-700 mt-1 ml-8">{{ meal.description }}</p>
-                        </div>
-                        <div class="flex space-x-4 text-sm text-gray-600 ml-4">
-                            {% if meal.calories %}
-                            <span class="bg-orange-100 text-orange-800 px-2 py-1 rounded">{{ meal.calories|round|int }} cal</span>
+                    
+                    <!-- Individual meal rows -->
+                    {% for meal in meals %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-2 text-gray-400"></td>
+                        <td class="px-4 py-2 text-gray-500">
+                            {{ meal.time_consumed if meal.time_consumed else '—' }}
+                        </td>
+                        <td class="px-4 py-2">
+                            {% if meal.meal_type == 'breakfast' %}🌅
+                            {% elif meal.meal_type == 'lunch' %}☀️
+                            {% elif meal.meal_type == 'dinner' %}🌙
+                            {% elif meal.meal_type == 'beverage' %}🥤
+                            {% else %}🍿{% endif %}
+                            <span class="capitalize">{{ meal.meal_type }}</span>
+                        </td>
+                        <td class="px-4 py-2 max-w-xs truncate" title="{{ meal.description }}">
+                            {{ meal.description }}
+                            {% if meal.caffeine_mg and meal.caffeine_mg > 0 %}
+                            <span class="text-amber-600">☕</span>
                             {% endif %}
-                            {% if meal.protein_g %}
-                            <span class="bg-red-100 text-red-800 px-2 py-1 rounded">{{ meal.protein_g|round|int }}g P</span>
+                            {% if meal.alcohol_units and meal.alcohol_units > 0 %}
+                            <span class="text-purple-600">🍷</span>
                             {% endif %}
-                            {% if meal.carbs_g %}
-                            <span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">{{ meal.carbs_g|round|int }}g C</span>
-                            {% endif %}
-                            {% if meal.fat_g %}
-                            <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded">{{ meal.fat_g|round|int }}g F</span>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
+                        </td>
+                        <td class="px-4 py-2 text-right text-gray-600">
+                            {{ meal.calories|round|int if meal.calories else '—' }}
+                        </td>
+                        <td class="px-4 py-2 text-right text-gray-600">
+                            {{ (meal.protein_g|round|int)|string + 'g' if meal.protein_g else '—' }}
+                        </td>
+                        <td class="px-4 py-2 text-right text-gray-600">
+                            {{ (meal.carbs_g|round|int)|string + 'g' if meal.carbs_g else '—' }}
+                        </td>
+                        <td class="px-4 py-2 text-right text-gray-600">
+                            {{ (meal.fat_g|round|int)|string + 'g' if meal.fat_g else '—' }}
+                        </td>
+                        <td class="px-4 py-2">
+                            <form action="/meals/delete" method="post" class="inline"
+                                  onsubmit="return confirm('Delete this meal?');">
+                                <input type="hidden" name="meal_id" value="{{ meal.id }}">
+                                <button type="submit" class="text-red-400 hover:text-red-600" title="Delete">✕</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
                 {% endfor %}
-            </div>
-        </div>
-        {% endfor %}
+            </tbody>
+        </table>
+    </div>
     {% else %}
     <div class="bg-white rounded-xl shadow p-12 text-center">
         <p class="text-gray-500 text-lg mb-4">No meals logged in the last {{ days }} days</p>

@@ -37,11 +37,9 @@ app.include_router(advisor.router, prefix="/advisor", tags=["advisor"])
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    """Home page with navigation."""
-    return templates.TemplateResponse(
-        "home.html",
-        {"request": request},
-    )
+    """Home page - redirect to today's entry."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/entries/new", status_code=302)
 
 
 @app.get("/health")

@@ -61,6 +61,8 @@ async def new_entry_form(
 ):
     """Show form for new/editing diary entry."""
     from ...services.routines import RoutinesService
+    from ...services.database import AnalyticsDB
+    from ...models.health import Meal, MealType
     from datetime import timedelta
     
     target_date = (
@@ -74,6 +76,41 @@ async def new_entry_form(
         # Get previous day's entry for defaults
         previous_date = target_date - timedelta(days=1)
         previous_entry = storage.get_entry(previous_date)
+    
+    # Load meals from DuckDB (source of truth for meals)
+    meals_with_ids = []
+    with AnalyticsDB() as analytics:
+        import pandas as pd
+        
+        meals_df = analytics.conn.execute("""
+            SELECT id, meal_type, description, time_consumed, 
+                   calories, protein_g, carbs_g, fat_g,
+                   contains_caffeine, contains_alcohol, alcohol_units
+            FROM meals
+            WHERE entry_date = ?
+            ORDER BY time_consumed ASC NULLS LAST, created_at ASC
+        """, [target_date]).df()
+        
+        if not meals_df.empty:
+            entry.meals = []
+            for _, row in meals_df.iterrows():
+                meal = Meal(
+                    meal_type=MealType(row['meal_type']) if pd.notna(row['meal_type']) else MealType.SNACK,
+                    description=row['description'] if pd.notna(row['description']) else "",
+                    time_consumed=row['time_consumed'] if pd.notna(row['time_consumed']) else None,
+                    calories=row['calories'] if pd.notna(row['calories']) else None,
+                    protein_g=row['protein_g'] if pd.notna(row['protein_g']) else None,
+                    carbs_g=row['carbs_g'] if pd.notna(row['carbs_g']) else None,
+                    fat_g=row['fat_g'] if pd.notna(row['fat_g']) else None,
+                    contains_caffeine=bool(row['contains_caffeine']) if pd.notna(row['contains_caffeine']) else False,
+                    contains_alcohol=bool(row['contains_alcohol']) if pd.notna(row['contains_alcohol']) else False,
+                    alcohol_units=row['alcohol_units'] if pd.notna(row['alcohol_units']) else None,
+                )
+                entry.meals.append(meal)
+                meals_with_ids.append({
+                    'id': row['id'],
+                    'meal': meal,
+                })
     
     # Fetch integrations if not already present
     if not entry.integrations.weather:
@@ -109,7 +146,7 @@ async def new_entry_form(
         "mood": previous_entry.mood if previous_entry else None,
     }
     
-    # Save updated integrations and quick_log
+    # Save updated integrations and quick_log (but NOT meals - they live in DuckDB)
     with get_storage() as storage:
         storage.save_entry(entry)
     
@@ -118,6 +155,7 @@ async def new_entry_form(
         {
             "request": request,
             "entry": entry,
+            "meals_with_ids": meals_with_ids,
             "symptom_types": list(SymptomType),
             "body_locations": list(BodyLocation),
             "incident_types": list(IncidentType),
@@ -261,6 +299,9 @@ async def add_meal(
     notes: Optional[str] = Form(default=None),
 ):
     """Add a meal to an entry."""
+    from ...services.database import AnalyticsDB
+    from ...services.nutrition import NutritionEstimator
+    
     target_date = datetime.strptime(entry_date, "%Y-%m-%d").date()
     
     parsed_time = None
@@ -270,20 +311,45 @@ async def add_meal(
         except ValueError:
             pass
     
-    meal = Meal(
-        meal_type=MealType(meal_type),
-        description=description,
-        time_consumed=parsed_time,
-        contains_alcohol=contains_alcohol,
-        alcohol_units=alcohol_units if contains_alcohol else None,
-        contains_caffeine=contains_caffeine,
-        notes=notes or None,
-    )
+    # Estimate nutrition
+    estimator = NutritionEstimator()
+    nutrition = estimator.estimate(description, meal_type)
     
-    with get_storage() as storage:
-        entry = storage.get_or_create_entry(target_date)
-        entry.add_meal(meal)
-        storage.save_entry(entry)
+    # Add caffeine/alcohol info to nutrition dict
+    if contains_caffeine and not nutrition.get('caffeine_mg'):
+        nutrition['caffeine_mg'] = 100  # Default estimate
+    if contains_alcohol:
+        nutrition['alcohol_units'] = alcohol_units or 1.0
+    
+    # Save to DuckDB (single source of truth for meals)
+    with AnalyticsDB() as analytics:
+        analytics.add_meal_with_nutrition(
+            entry_date=target_date,
+            meal_type=meal_type,
+            description=description,
+            nutrition=nutrition,
+            time_consumed=parsed_time,
+            notes=notes,
+        )
+    
+    return RedirectResponse(
+        url=f"/entries/new?entry_date={entry_date}",
+        status_code=303,
+    )
+
+
+@router.post("/meal/delete")
+async def delete_meal(
+    request: Request,
+    meal_id: str = Form(...),
+    entry_date: str = Form(...),
+):
+    """Delete a meal."""
+    from ...services.database import AnalyticsDB
+    
+    with AnalyticsDB() as analytics:
+        analytics.conn.execute("DELETE FROM meals WHERE id = ?", [meal_id])
+        analytics.conn.execute("CHECKPOINT")
     
     return RedirectResponse(
         url=f"/entries/new?entry_date={entry_date}",

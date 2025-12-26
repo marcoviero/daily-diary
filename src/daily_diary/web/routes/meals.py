@@ -30,6 +30,7 @@ async def meals_list(
         # Get meals from database
         meals_df = analytics.conn.execute("""
             SELECT 
+                id,
                 entry_date,
                 meal_type,
                 description,
@@ -118,5 +119,18 @@ async def quick_add_meal(
             description=description,
             nutrition=nutrition,
         )
+    
+    return RedirectResponse(url="/meals/", status_code=303)
+
+
+@router.post("/delete")
+async def delete_meal(
+    request: Request,
+    meal_id: str = Form(...),
+):
+    """Delete a meal."""
+    with AnalyticsDB() as analytics:
+        analytics.conn.execute("DELETE FROM meals WHERE id = ?", [meal_id])
+        analytics.conn.execute("CHECKPOINT")
     
     return RedirectResponse(url="/meals/", status_code=303)
