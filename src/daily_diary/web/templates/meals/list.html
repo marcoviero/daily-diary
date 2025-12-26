@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Meals & Nutrition - Daily Diary{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-800">🍽️ Meals & Nutrition</h1>
+        <div class="flex space-x-4 items-center">
+            <select onchange="window.location.href='/meals/?days=' + this.value" 
+                    class="border rounded px-3 py-2">
+                <option value="7" {% if days == 7 %}selected{% endif %}>Last 7 days</option>
+                <option value="14" {% if days == 14 %}selected{% endif %}>Last 14 days</option>
+                <option value="30" {% if days == 30 %}selected{% endif %}>Last 30 days</option>
+                <option value="90" {% if days == 90 %}selected{% endif %}>Last 90 days</option>
+            </select>
+        </div>
+    </div>
+    
+    <!-- Weekly Averages Summary -->
+    {% if weekly_avg %}
+    <div class="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-6 mb-6">
+        <h2 class="text-lg font-semibold text-gray-700 mb-4">📊 Daily Averages ({{ days }} days)</h2>
+        <div class="grid grid-cols-4 gap-6">
+            <div class="text-center">
+                <p class="text-3xl font-bold text-orange-600">{{ weekly_avg.calories|round|int }}</p>
+                <p class="text-sm text-gray-600">Calories</p>
+            </div>
+            <div class="text-center">
+                <p class="text-3xl font-bold text-red-600">{{ weekly_avg.protein_g|round|int }}g</p>
+                <p class="text-sm text-gray-600">Protein</p>
+            </div>
+            <div class="text-center">
+                <p class="text-3xl font-bold text-yellow-600">{{ weekly_avg.carbs_g|round|int }}g</p>
+                <p class="text-sm text-gray-600">Carbs</p>
+            </div>
+            <div class="text-center">
+                <p class="text-3xl font-bold text-blue-600">{{ weekly_avg.fat_g|round|int }}g</p>
+                <p class="text-sm text-gray-600">Fat</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Quick Add Meal -->
+    <div class="bg-white rounded-xl shadow p-6 mb-6">
+        <h2 class="text-lg font-semibold text-gray-700 mb-4">➕ Quick Add Meal</h2>
+        <form action="/meals/quick-add" method="post" class="flex flex-wrap gap-4 items-end">
+            <div class="flex-grow min-w-64">
+                <label class="block text-sm font-medium text-gray-700 mb-1">What did you eat?</label>
+                <input type="text" name="description" required
+                       class="w-full border rounded px-3 py-2"
+                       placeholder="e.g., Chicken salad with olive oil dressing">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                <select name="meal_type" class="border rounded px-3 py-2">
+                    <option value="breakfast">Breakfast</option>
+                    <option value="lunch">Lunch</option>
+                    <option value="dinner">Dinner</option>
+                    <option value="snack" selected>Snack</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                <input type="date" name="entry_date" value="{{ end_date }}"
+                       class="border rounded px-3 py-2">
+            </div>
+            <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">
+                Add & Estimate
+            </button>
+        </form>
+    </div>
+    
+    <!-- Meals by Date -->
+    {% if meals_by_date %}
+        {% for entry_date, meals in meals_by_date.items() %}
+        <div class="bg-white rounded-xl shadow mb-4 overflow-hidden">
+            <!-- Date Header with Totals -->
+            <div class="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
+                <div>
+                    <h3 class="font-bold text-lg text-gray-800">
+                        {{ entry_date.strftime('%A, %B %d') if entry_date.strftime else entry_date }}
+                    </h3>
+                    <p class="text-sm text-gray-500">{{ meals|length }} meal{% if meals|length != 1 %}s{% endif %}</p>
+                </div>
+                {% if daily_totals.get(entry_date) %}
+                {% set totals = daily_totals[entry_date] %}
+                <div class="flex space-x-6 text-sm">
+                    <div class="text-center">
+                        <p class="font-bold text-orange-600">{{ totals.calories|round|int }}</p>
+                        <p class="text-gray-500">cal</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="font-bold text-red-600">{{ totals.protein_g|round|int }}g</p>
+                        <p class="text-gray-500">protein</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="font-bold text-yellow-600">{{ totals.carbs_g|round|int }}g</p>
+                        <p class="text-gray-500">carbs</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="font-bold text-blue-600">{{ totals.fat_g|round|int }}g</p>
+                        <p class="text-gray-500">fat</p>
+                    </div>
+                    {% if totals.caffeine_mg > 0 %}
+                    <div class="text-center">
+                        <p class="font-bold text-amber-600">{{ totals.caffeine_mg|round|int }}mg</p>
+                        <p class="text-gray-500">caffeine</p>
+                    </div>
+                    {% endif %}
+                    {% if totals.alcohol_units > 0 %}
+                    <div class="text-center">
+                        <p class="font-bold text-purple-600">{{ totals.alcohol_units|round(1) }}</p>
+                        <p class="text-gray-500">drinks</p>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Individual Meals -->
+            <div class="divide-y">
+                {% for meal in meals %}
+                <div class="px-6 py-4 hover:bg-gray-50">
+                    <div class="flex justify-between items-start">
+                        <div class="flex-grow">
+                            <div class="flex items-center space-x-3">
+                                <span class="text-lg">
+                                    {% if meal.meal_type == 'breakfast' %}🌅
+                                    {% elif meal.meal_type == 'lunch' %}☀️
+                                    {% elif meal.meal_type == 'dinner' %}🌙
+                                    {% elif meal.meal_type == 'beverage' %}🥤
+                                    {% else %}🍿{% endif %}
+                                </span>
+                                <span class="font-medium text-gray-800 capitalize">{{ meal.meal_type }}</span>
+                                {% if meal.time_consumed %}
+                                <span class="text-sm text-gray-500">{{ meal.time_consumed }}</span>
+                                {% endif %}
+                            </div>
+                            <p class="text-gray-700 mt-1 ml-8">{{ meal.description }}</p>
+                        </div>
+                        <div class="flex space-x-4 text-sm text-gray-600 ml-4">
+                            {% if meal.calories %}
+                            <span class="bg-orange-100 text-orange-800 px-2 py-1 rounded">{{ meal.calories|round|int }} cal</span>
+                            {% endif %}
+                            {% if meal.protein_g %}
+                            <span class="bg-red-100 text-red-800 px-2 py-1 rounded">{{ meal.protein_g|round|int }}g P</span>
+                            {% endif %}
+                            {% if meal.carbs_g %}
+                            <span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">{{ meal.carbs_g|round|int }}g C</span>
+                            {% endif %}
+                            {% if meal.fat_g %}
+                            <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded">{{ meal.fat_g|round|int }}g F</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+    <div class="bg-white rounded-xl shadow p-12 text-center">
+        <p class="text-gray-500 text-lg mb-4">No meals logged in the last {{ days }} days</p>
+        <p class="text-gray-400">Use the quick add form above or log meals in your daily entry</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

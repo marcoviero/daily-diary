@@ -59,13 +59,13 @@
         "id": "fingolimod",
         "name": "Fingolimod",
         "dosage": "0.5mg (every other day)",
-        "default_count": 1
+        "default_count": 0
       },
       {
         "id": "vitamin_d",
         "name": "Vitamin D",
         "dosage": "5000 IU",
-        "default_count": 1
+        "default_count": 0
       },
       {
         "id": "magnesium",
