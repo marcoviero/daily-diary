@@ -9,10 +9,10 @@ from pydantic import BaseModel, Field
 class WeatherData(BaseModel):
     """Weather conditions for a day."""
     
-    # Temperature
-    temp_high_f: Optional[float] = None
-    temp_low_f: Optional[float] = None
-    temp_avg_f: Optional[float] = None
+    # Temperature (Celsius)
+    temp_high_c: Optional[float] = None
+    temp_low_c: Optional[float] = None
+    temp_avg_c: Optional[float] = None
     
     # Pressure (important for headaches!)
     pressure_hpa: Optional[float] = None
@@ -53,12 +53,12 @@ class ActivityData(BaseModel):
     max_heart_rate: Optional[float] = None
     average_power_watts: Optional[float] = None
     normalized_power_watts: Optional[float] = None
-
+    
     # Cycling-specific
     average_cadence: Optional[float] = None
-
+    
     # Perceived effort
-    suffer_score: Optional[float] = None
+    suffer_score: Optional[float] = None  # Strava's relative effort
     
     # Timing
     start_time: Optional[datetime] = None
@@ -85,10 +85,10 @@ class SleepData(BaseModel):
     sleep_score: Optional[int] = None
     efficiency_percent: Optional[int] = None
     
-    # Physiological
+    # Physiological (floats - APIs return decimals)
     lowest_heart_rate: Optional[float] = None
     average_heart_rate: Optional[float] = None
-    hrv_average: Optional[float] = None
+    hrv_average: Optional[float] = None  # Heart rate variability
     respiratory_rate: Optional[float] = None
     
     # Readiness (Oura's overall readiness score)

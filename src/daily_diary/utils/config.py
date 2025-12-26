@@ -25,8 +25,11 @@ class Settings(BaseSettings):
     strava_client_secret: Optional[str] = None
     strava_refresh_token: Optional[str] = None
     
-    # Oura API
-    oura_access_token: Optional[str] = None
+    # Oura API (OAuth2 or Personal Access Token)
+    oura_access_token: Optional[str] = None  # PAT (legacy) or leave blank for OAuth2
+    oura_client_id: Optional[str] = None     # OAuth2
+    oura_client_secret: Optional[str] = None # OAuth2
+    oura_refresh_token: Optional[str] = None # OAuth2
     
     # OpenAI (for Whisper transcription)
     openai_api_key: Optional[str] = None
@@ -52,7 +55,14 @@ class Settings(BaseSettings):
     
     @property
     def has_oura(self) -> bool:
-        return self.oura_access_token is not None
+        # Either PAT or OAuth2 credentials
+        has_pat = self.oura_access_token is not None
+        has_oauth = all([
+            self.oura_client_id,
+            self.oura_client_secret,
+            self.oura_refresh_token,
+        ])
+        return has_pat or has_oauth
     
     @property
     def has_transcription(self) -> bool:

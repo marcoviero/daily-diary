@@ -151,9 +151,9 @@ class AnalysisService:
         if entry.integrations.weather:
             w = entry.integrations.weather
             row.update({
-                'temp_avg_f': w.temp_avg_f,
-                'temp_high_f': w.temp_high_f,
-                'temp_low_f': w.temp_low_f,
+                'temp_avg_c': w.temp_avg_c,
+                'temp_high_c': w.temp_high_c,
+                'temp_low_c': w.temp_low_c,
                 'pressure_hpa': w.pressure_hpa,
                 'humidity_percent': w.humidity_percent,
                 'wind_speed_mph': w.wind_speed_mph,
@@ -210,7 +210,7 @@ class AnalysisService:
         # Factors to correlate against
         continuous_factors = [
             ('pressure_hpa', 'Barometric Pressure'),
-            ('temp_avg_f', 'Average Temperature'),
+            ('temp_avg_c', 'Average Temperature'),
             ('humidity_percent', 'Humidity'),
             ('sleep_score', 'Sleep Score'),
             ('total_sleep_hours', 'Total Sleep Duration'),

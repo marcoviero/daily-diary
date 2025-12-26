@@ -144,8 +144,8 @@ def list_entries(
             if entry.integrations.weather:
                 w = entry.integrations.weather
                 parts = []
-                if w.temp_avg_f:
-                    parts.append(f"{w.temp_avg_f:.0f}°F")
+                if w.temp_avg_c:
+                    parts.append(f"{w.temp_avg_c:.0f}°C")
                 if w.pressure_hpa:
                     parts.append(f"{w.pressure_hpa:.0f}hPa")
                 weather_str = " ".join(parts) if parts else "-"
@@ -309,7 +309,7 @@ def fetch(
                 data = weather.get_weather_for_date(entry_date)
                 if data:
                     entry.integrations.weather = data
-                    console.print(f"[green]✓[/green] {data.temp_avg_f:.0f}°F, {data.pressure_hpa} hPa")
+                    console.print(f"[green]✓[/green] {data.temp_avg_c:.0f}°C, {data.pressure_hpa} hPa")
                 else:
                     console.print("[yellow]no data[/yellow]")
             else:

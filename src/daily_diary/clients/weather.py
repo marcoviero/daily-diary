@@ -47,16 +47,16 @@ class WeatherClient:
                     "lat": lat,
                     "lon": lon,
                     "appid": self.settings.openweather_api_key,
-                    "units": "imperial",  # Fahrenheit
+                    "units": "metric",  # Celsius
                 },
             )
             response.raise_for_status()
             data = response.json()
             
             return WeatherData(
-                temp_avg_f=data["main"]["temp"],
-                temp_high_f=data["main"]["temp_max"],
-                temp_low_f=data["main"]["temp_min"],
+                temp_avg_c=data["main"]["temp"],
+                temp_high_c=data["main"]["temp_max"],
+                temp_low_c=data["main"]["temp_min"],
                 pressure_hpa=data["main"]["pressure"],
                 humidity_percent=data["main"]["humidity"],
                 description=data["weather"][0]["description"] if data.get("weather") else None,

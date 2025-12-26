@@ -125,7 +125,7 @@ class DiaryPrompter:
             w = entry.integrations.weather
             self.console.print(
                 f"  🌤️  Weather: {w.description or 'N/A'}, "
-                f"{w.temp_avg_f:.0f}°F, "
+                f"{w.temp_avg_c:.0f}°C, "
                 f"Pressure: {w.pressure_hpa} hPa"
             )
         

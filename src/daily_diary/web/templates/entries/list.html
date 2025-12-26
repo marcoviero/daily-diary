@@ -92,8 +92,8 @@
                 <td class="px-6 py-4">
                     {% if entry.integrations.weather %}
                     <div class="text-sm">
-                        {% if entry.integrations.weather.temp_avg_f %}
-                        {{ entry.integrations.weather.temp_avg_f|round|int }}°F
+                        {% if entry.integrations.weather.temp_avg_c %}
+                        {{ entry.integrations.weather.temp_avg_c|round|int }}°C
                         {% endif %}
                         {% if entry.integrations.weather.pressure_hpa %}
                         <span class="text-gray-500">
