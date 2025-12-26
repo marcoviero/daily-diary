@@ -310,38 +310,50 @@ async def transcribe_audio(
     """
     Transcribe audio recording and append to entry notes.
     
-    Uses OpenAI Whisper API or Anthropic for transcription.
+    Uses local faster-whisper (if installed) or OpenAI Whisper API.
     """
     from ...services.transcription import TranscriptionService
-    from ...utils.config import get_settings
     
-    settings = get_settings()
     target_date = datetime.strptime(entry_date, "%Y-%m-%d").date()
     
-    # Check if transcription is available
-    if not settings.openai_api_key:
+    # Check if any transcription method is available
+    transcription_service = TranscriptionService()
+    
+    if not transcription_service.is_configured:
         return JSONResponse(
-            {"success": False, "error": "Transcription not configured. Add OPENAI_API_KEY to .env"},
+            {
+                "success": False, 
+                "error": "No transcription method available.\n\n"
+                         "Option 1 (free, local): pip install faster-whisper\n"
+                         "Option 2 (API): Add OPENAI_API_KEY to .env"
+            },
             status_code=400
         )
     
+    tmp_path = None
     try:
         # Save uploaded audio to temp file
+        content = await audio.read()
+        
+        if len(content) < 100:
+            return JSONResponse(
+                {"success": False, "error": f"Audio file too small ({len(content)} bytes). Recording may have failed."},
+                status_code=400
+            )
+        
         with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
-            content = await audio.read()
             tmp.write(content)
             tmp_path = Path(tmp.name)
         
-        # Transcribe
-        transcription_service = TranscriptionService()
+        # Transcribe (tries local first, then OpenAI)
         text = transcription_service.transcribe_file(tmp_path)
         
-        # Clean up temp file
-        tmp_path.unlink()
+        # Determine which method was used
+        method = "local (faster-whisper)" if transcription_service.has_local else "OpenAI API"
         
         if not text:
             return JSONResponse(
-                {"success": False, "error": "Transcription returned empty result"},
+                {"success": False, "error": "Transcription returned empty result. Try speaking louder or longer."},
                 status_code=400
             )
         
@@ -364,11 +376,36 @@ async def transcribe_audio(
         return JSONResponse({
             "success": True,
             "transcription": text,
-            "message": "Transcription added to notes"
+            "method": method,
+            "message": f"Transcription added to notes (via {method})"
         })
         
-    except Exception as e:
+    except ValueError as e:
         return JSONResponse(
             {"success": False, "error": str(e)},
+            status_code=400
+        )
+    except RuntimeError as e:
+        # OpenAI API errors
+        error_msg = str(e)
+        if "insufficient_quota" in error_msg.lower() or "429" in error_msg:
+            return JSONResponse(
+                {"success": False, "error": "OpenAI API quota exceeded. Check your billing at platform.openai.com"},
+                status_code=402
+            )
+        return JSONResponse(
+            {"success": False, "error": f"Transcription failed: {error_msg}"},
             status_code=500
         )
+    except Exception as e:
+        return JSONResponse(
+            {"success": False, "error": f"Unexpected error: {type(e).__name__}: {str(e)}"},
+            status_code=500
+        )
+    finally:
+        # Clean up temp file
+        if tmp_path and tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except Exception:
+                pass

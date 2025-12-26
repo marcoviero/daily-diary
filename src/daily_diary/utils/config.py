@@ -31,10 +31,10 @@ class Settings(BaseSettings):
     oura_client_secret: Optional[str] = None # OAuth2
     oura_refresh_token: Optional[str] = None # OAuth2
     
-    # OpenAI (for Whisper transcription and nutrition fallback)
+    # OpenAI (optional - for Whisper API if faster-whisper not installed)
     openai_api_key: Optional[str] = None
     
-    # Anthropic (for nutrition estimation)
+    # Anthropic (for nutrition estimation and health advisor)
     anthropic_api_key: Optional[str] = None
     
     # Location defaults (Portland, OR)
