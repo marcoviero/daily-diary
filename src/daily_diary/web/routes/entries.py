@@ -17,7 +17,10 @@ from ...models.health import (
     IncidentType,
     Meal,
     MealType,
+    Medication,
+    MedicationForm,
     Severity,
+    Supplement,
     Symptom,
     SymptomType,
 )
@@ -57,6 +60,9 @@ async def new_entry_form(
     entry_date: Optional[str] = Query(default=None),
 ):
     """Show form for new/editing diary entry."""
+    from ...services.routines import RoutinesService
+    from datetime import timedelta
+    
     target_date = (
         datetime.strptime(entry_date, "%Y-%m-%d").date()
         if entry_date
@@ -65,6 +71,9 @@ async def new_entry_form(
     
     with get_storage() as storage:
         entry = storage.get_or_create_entry(target_date)
+        # Get previous day's entry for defaults
+        previous_date = target_date - timedelta(days=1)
+        previous_entry = storage.get_entry(previous_date)
     
     # Fetch integrations if not already present
     if not entry.integrations.weather:
@@ -82,7 +91,25 @@ async def new_entry_form(
         if oura_client.is_configured:
             entry.integrations.sleep = oura_client.get_sleep_for_date(target_date)
     
-    # Save updated integrations
+    # Get routines and calculate totals
+    routines_service = RoutinesService()
+    routine_categories = routines_service.get_categories()
+    
+    # Initialize quick_log with defaults if empty
+    if not entry.quick_log:
+        entry.quick_log = routines_service.get_default_counts()
+    
+    quick_log_totals = routines_service.calculate_totals(entry.quick_log)
+    
+    # Build previous day defaults for assessment
+    prev_defaults = {
+        "overall_wellbeing": previous_entry.overall_wellbeing if previous_entry else None,
+        "energy_level": previous_entry.energy_level if previous_entry else None,
+        "stress_level": previous_entry.stress_level if previous_entry else None,
+        "mood": previous_entry.mood if previous_entry else None,
+    }
+    
+    # Save updated integrations and quick_log
     with get_storage() as storage:
         storage.save_entry(entry)
     
@@ -96,6 +123,9 @@ async def new_entry_form(
             "incident_types": list(IncidentType),
             "meal_types": list(MealType),
             "severities": list(range(11)),
+            "routine_categories": routine_categories,
+            "quick_log_totals": quick_log_totals,
+            "prev_defaults": prev_defaults,
         },
     )
 
@@ -261,6 +291,87 @@ async def add_meal(
     )
 
 
+@router.post("/medication")
+async def add_medication(
+    request: Request,
+    entry_date: str = Form(...),
+    name: str = Form(...),
+    dosage: Optional[str] = Form(default=None),
+    form: Optional[str] = Form(default=None),
+    time_taken: Optional[str] = Form(default=None),
+    reason: Optional[str] = Form(default=None),
+):
+    """Add a medication to an entry."""
+    target_date = datetime.strptime(entry_date, "%Y-%m-%d").date()
+    
+    parsed_time = None
+    if time_taken:
+        try:
+            parsed_time = datetime.strptime(time_taken, "%H:%M").time()
+        except ValueError:
+            pass
+    
+    med_form = None
+    if form:
+        try:
+            med_form = MedicationForm(form)
+        except ValueError:
+            med_form = MedicationForm.OTHER
+    
+    medication = Medication(
+        name=name,
+        dosage=dosage or None,
+        form=med_form,
+        time_taken=parsed_time,
+        reason=reason or None,
+    )
+    
+    with get_storage() as storage:
+        entry = storage.get_or_create_entry(target_date)
+        entry.add_medication(medication)
+        storage.save_entry(entry)
+    
+    return RedirectResponse(
+        url=f"/entries/new?entry_date={entry_date}",
+        status_code=303,
+    )
+
+
+@router.post("/supplement")
+async def add_supplement(
+    request: Request,
+    entry_date: str = Form(...),
+    name: str = Form(...),
+    dosage: Optional[str] = Form(default=None),
+    time_taken: Optional[str] = Form(default=None),
+):
+    """Add a supplement to an entry."""
+    target_date = datetime.strptime(entry_date, "%Y-%m-%d").date()
+    
+    parsed_time = None
+    if time_taken:
+        try:
+            parsed_time = datetime.strptime(time_taken, "%H:%M").time()
+        except ValueError:
+            pass
+    
+    supplement = Supplement(
+        name=name,
+        dosage=dosage or None,
+        time_taken=parsed_time,
+    )
+    
+    with get_storage() as storage:
+        entry = storage.get_or_create_entry(target_date)
+        entry.add_supplement(supplement)
+        storage.save_entry(entry)
+    
+    return RedirectResponse(
+        url=f"/entries/new?entry_date={entry_date}",
+        status_code=303,
+    )
+
+
 @router.post("/complete")
 async def mark_complete(
     request: Request,
@@ -306,13 +417,16 @@ async def view_entry(
 async def transcribe_audio(
     audio: UploadFile = File(...),
     entry_date: str = Form(...),
+    parse_content: bool = Form(default=True),  # Whether to parse and extract structured data
 ):
     """
-    Transcribe audio recording and append to entry notes.
+    Transcribe audio recording, parse it, and populate diary entry.
     
-    Uses local faster-whisper (if installed) or OpenAI Whisper API.
+    Uses local faster-whisper (if installed) or OpenAI Whisper API for transcription.
+    Uses Claude or OpenAI to parse the content and extract structured data.
     """
     from ...services.transcription import TranscriptionService
+    from ...services.diary_parser import DiaryParser
     
     target_date = datetime.strptime(entry_date, "%Y-%m-%d").date()
     
@@ -349,7 +463,7 @@ async def transcribe_audio(
         text = transcription_service.transcribe_file(tmp_path)
         
         # Determine which method was used
-        method = "local (faster-whisper)" if transcription_service.has_local else "OpenAI API"
+        transcription_method = "local (faster-whisper)" if transcription_service.has_local else "OpenAI API"
         
         if not text:
             return JSONResponse(
@@ -357,11 +471,20 @@ async def transcribe_audio(
                 status_code=400
             )
         
-        # Append to entry notes
+        # Parse the transcribed text and extract structured data
+        parsed_data = None
+        parse_summary = None
+        
+        if parse_content:
+            parser = DiaryParser()
+            if parser.is_configured:
+                parsed_data = parser.parse(text)
+        
+        # Apply to entry
         with get_storage() as storage:
             entry = storage.get_or_create_entry(target_date)
             
-            # Add transcribed text to general notes
+            # Add transcribed text to general notes (always keep the raw transcription)
             timestamp = datetime.now().strftime("%H:%M")
             new_note = f"[Voice note {timestamp}] {text}"
             
@@ -370,15 +493,55 @@ async def transcribe_audio(
             else:
                 entry.general_notes = new_note
             
+            # If we parsed successfully, apply the extracted data
+            if parsed_data and parsed_data.get("success"):
+                parser = DiaryParser()
+                parse_summary = parser.apply_to_entry(parsed_data, entry)
+            
             entry.updated_at = datetime.now()
             storage.save_entry(entry)
         
-        return JSONResponse({
+        # Build response
+        response_data = {
             "success": True,
             "transcription": text,
-            "method": method,
-            "message": f"Transcription added to notes (via {method})"
-        })
+            "transcription_method": transcription_method,
+        }
+        
+        if parsed_data and parsed_data.get("success"):
+            response_data["parsing"] = {
+                "success": True,
+                "provider": parsed_data.get("provider"),
+                "extracted": parse_summary,
+            }
+            
+            # Build a human-readable summary
+            parts = []
+            if parse_summary.get("meals_added"):
+                parts.append(f"{parse_summary['meals_added']} meal(s)")
+            if parse_summary.get("medications_added"):
+                parts.append(f"{parse_summary['medications_added']} medication(s)")
+            if parse_summary.get("supplements_added"):
+                parts.append(f"{parse_summary['supplements_added']} supplement(s)")
+            if parse_summary.get("symptoms_added"):
+                parts.append(f"{parse_summary['symptoms_added']} symptom(s)")
+            if parse_summary.get("incidents_added"):
+                parts.append(f"{parse_summary['incidents_added']} incident(s)")
+            if parse_summary.get("wellbeing_updated"):
+                parts.append("wellbeing scores")
+            
+            if parts:
+                response_data["message"] = f"Transcribed and extracted: {', '.join(parts)}"
+            else:
+                response_data["message"] = "Transcribed (no structured data extracted)"
+        else:
+            response_data["parsing"] = {
+                "success": False,
+                "reason": "Parser not configured or failed" if parse_content else "Parsing disabled",
+            }
+            response_data["message"] = f"Transcription added to notes (via {transcription_method})"
+        
+        return JSONResponse(response_data)
         
     except ValueError as e:
         return JSONResponse(
@@ -409,3 +572,57 @@ async def transcribe_audio(
                 tmp_path.unlink()
             except Exception:
                 pass
+
+
+@router.post("/api/quick-log")
+async def update_quick_log(
+    entry_date: str = Form(...),
+    item_id: Optional[str] = Form(default=None),
+    count: Optional[float] = Form(default=None),
+    action: Optional[str] = Form(default=None),  # 'reset_defaults' or 'clear_all'
+):
+    """
+    Update quick log counts for an entry.
+    
+    Can update a single item count, reset to defaults, or clear all.
+    """
+    from ...services.routines import RoutinesService
+    
+    target_date = datetime.strptime(entry_date, "%Y-%m-%d").date()
+    routines_service = RoutinesService()
+    
+    try:
+        with get_storage() as storage:
+            entry = storage.get_or_create_entry(target_date)
+            
+            # Initialize quick_log if empty
+            if not entry.quick_log:
+                entry.quick_log = {}
+            
+            if action == "reset_defaults":
+                # Reset to default counts
+                entry.quick_log = routines_service.get_default_counts()
+            elif action == "clear_all":
+                # Clear all counts to zero
+                entry.quick_log = {k: 0 for k in routines_service.get_default_counts()}
+            elif item_id and count is not None:
+                # Update single item
+                entry.quick_log[item_id] = max(0, count)
+            
+            entry.updated_at = datetime.now()
+            storage.save_entry(entry)
+            
+            # Calculate updated totals
+            totals = routines_service.calculate_totals(entry.quick_log)
+        
+        return JSONResponse({
+            "success": True,
+            "quick_log": entry.quick_log,
+            "totals": totals,
+        })
+        
+    except Exception as e:
+        return JSONResponse(
+            {"success": False, "error": str(e)},
+            status_code=500
+        )

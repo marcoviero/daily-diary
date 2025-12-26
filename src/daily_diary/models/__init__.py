@@ -1,7 +1,7 @@
 """Data models for the diary application."""
 
 from .entry import DiaryEntry
-from .health import Incident, Meal, Symptom
+from .health import Incident, Meal, Medication, Supplement, Symptom
 from .integrations import ActivityData, SleepData, WeatherData
 
 __all__ = [
@@ -9,6 +9,8 @@ __all__ = [
     "Symptom",
     "Incident",
     "Meal",
+    "Medication",
+    "Supplement",
     "WeatherData",
     "ActivityData",
     "SleepData",

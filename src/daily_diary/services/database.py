@@ -1043,8 +1043,13 @@ class AnalyticsDB:
         return self.conn.execute(query, params).df()
     
     def close(self) -> None:
-        """Close database connection."""
+        """Close database connection with checkpoint."""
         if self._conn:
+            # Checkpoint to flush WAL and reclaim space
+            try:
+                self._conn.execute("CHECKPOINT")
+            except Exception:
+                pass
             self._conn.close()
             self._conn = None
     

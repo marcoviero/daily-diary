@@ -66,8 +66,10 @@ Return ONLY the JSON object, no other text."""
             try:
                 import anthropic
                 self._anthropic_client = anthropic.Anthropic(api_key=self.settings.anthropic_api_key)
-            except ImportError:
-                pass
+            except ImportError as e:
+                print(f"[DEBUG] Failed to import anthropic: {e}")
+            except Exception as e:
+                print(f"[DEBUG] Failed to create Anthropic client: {e}")
         return self._anthropic_client
     
     @property
@@ -76,8 +78,10 @@ Return ONLY the JSON object, no other text."""
             try:
                 from openai import OpenAI
                 self._openai_client = OpenAI(api_key=self.settings.openai_api_key)
-            except ImportError:
-                pass
+            except ImportError as e:
+                print(f"[DEBUG] Failed to import openai: {e}")
+            except Exception as e:
+                print(f"[DEBUG] Failed to create OpenAI client: {e}")
         return self._openai_client
     
     @property
@@ -137,6 +141,7 @@ Return ONLY the JSON object, no other text."""
             import anthropic
             
             if not self.anthropic_client:
+                print("[DEBUG] Anthropic client is None")
                 return None
             
             response = self.anthropic_client.messages.create(
@@ -157,12 +162,15 @@ Return ONLY the JSON object, no other text."""
                 text = text.split("```")[1].split("```")[0]
             
             result = json.loads(text.strip())
-            result["source"] = "claude"
+            result["source"] = "llm"
             result["model"] = "claude-sonnet-4-20250514"
             return result
             
+        except anthropic.APIError as e:
+            print(f"[DEBUG] Claude API error: {e}")
+            return None
         except Exception as e:
-            print(f"Claude nutrition estimation error: {e}")
+            print(f"[DEBUG] Claude estimation error ({type(e).__name__}): {e}")
             return None
     
     def _try_openai(self, prompt: str) -> Optional[dict]:

@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
-from .health import Incident, Meal, Symptom
+from .health import Incident, Meal, Medication, Supplement, Symptom
 from .integrations import DailyIntegrations
 
 
@@ -25,6 +25,11 @@ class DiaryEntry(BaseModel):
     symptoms: list[Symptom] = Field(default_factory=list)
     incidents: list[Incident] = Field(default_factory=list)
     meals: list[Meal] = Field(default_factory=list)
+    medications: list[Medication] = Field(default_factory=list)
+    supplements: list[Supplement] = Field(default_factory=list)
+    
+    # Quick log counters (item_id -> count)
+    quick_log: dict[str, float] = Field(default_factory=dict)
     
     # Integrated data (auto-fetched)
     integrations: DailyIntegrations = Field(default_factory=DailyIntegrations)
@@ -56,6 +61,16 @@ class DiaryEntry(BaseModel):
     def add_meal(self, meal: Meal) -> None:
         """Add a meal to this entry."""
         self.meals.append(meal)
+        self.updated_at = datetime.now()
+    
+    def add_medication(self, medication: Medication) -> None:
+        """Add a medication to this entry."""
+        self.medications.append(medication)
+        self.updated_at = datetime.now()
+    
+    def add_supplement(self, supplement: Supplement) -> None:
+        """Add a supplement to this entry."""
+        self.supplements.append(supplement)
         self.updated_at = datetime.now()
     
     def mark_complete(self) -> None:

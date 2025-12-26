@@ -153,4 +153,50 @@ class Meal(BaseModel):
     contains_caffeine: bool = False
     contains_common_triggers: list[str] = Field(default_factory=list)  # e.g., MSG, aged cheese
     
+    # Nutritional info (can be estimated by LLM)
+    calories: Optional[int] = None
+    protein_g: Optional[float] = None
+    carbs_g: Optional[float] = None
+    fat_g: Optional[float] = None
+    
+    notes: Optional[str] = None
+
+
+class MedicationForm(str, Enum):
+    """Medication delivery forms."""
+    TABLET = "tablet"
+    CAPSULE = "capsule"
+    LIQUID = "liquid"
+    INJECTION = "injection"
+    TOPICAL = "topical"
+    INHALER = "inhaler"
+    PATCH = "patch"
+    DROPS = "drops"
+    SPRAY = "spray"
+    OTHER = "other"
+
+
+class Medication(BaseModel):
+    """A medication taken."""
+    
+    name: str  # e.g., "Sumatriptan", "Ibuprofen"
+    dosage: Optional[str] = None  # e.g., "100mg", "2 tablets"
+    form: Optional[MedicationForm] = None
+    time_taken: Optional[time] = None
+    
+    # Why it was taken
+    reason: Optional[str] = None  # e.g., "headache", "prevention"
+    
+    # Effectiveness (can be updated later)
+    effectiveness: Optional[int] = None  # 1-10 scale
+    
+    notes: Optional[str] = None
+
+
+class Supplement(BaseModel):
+    """A supplement or vitamin taken."""
+    
+    name: str  # e.g., "Vitamin D", "Magnesium", "Fish Oil"
+    dosage: Optional[str] = None  # e.g., "1000 IU", "400mg"
+    time_taken: Optional[time] = None
     notes: Optional[str] = None

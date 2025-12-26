@@ -1,6 +1,6 @@
 """Command-line interface for Daily Diary."""
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -21,13 +21,31 @@ console = Console()
 
 
 def parse_date(date_str: Optional[str]) -> date:
-    """Parse a date string or return today."""
-    if date_str is None:
+    """Parse a date string or return today.
+    
+    Supports:
+    - None or empty: today
+    - "today": today
+    - "yesterday": yesterday
+    - "-N": N days ago (e.g., "-1" = yesterday, "-7" = a week ago)
+    - "YYYY-MM-DD": specific date
+    """
+    if date_str is None or date_str.lower() == "today":
         return date.today()
+    
+    if date_str.lower() == "yesterday":
+        return date.today() - timedelta(days=1)
+    
+    # Relative days: -1, -2, -7, etc.
+    if date_str.startswith("-") and date_str[1:].isdigit():
+        days_ago = int(date_str[1:])
+        return date.today() - timedelta(days=days_ago)
+    
     try:
         return datetime.strptime(date_str, "%Y-%m-%d").date()
     except ValueError:
-        console.print(f"[red]Invalid date format: {date_str}. Use YYYY-MM-DD[/red]")
+        console.print(f"[red]Invalid date format: {date_str}[/red]")
+        console.print("[dim]Use: YYYY-MM-DD, 'yesterday', or -N (days ago)[/dim]")
         raise typer.Exit(1)
 
 
@@ -621,6 +639,120 @@ def sleep_trends(
             )
         
         console.print(table)
+
+
+@app.command()
+def db_stats():
+    """Show database statistics and table sizes."""
+    from .services.database import AnalyticsDB
+    import os
+    
+    with AnalyticsDB() as analytics:
+        db_path = analytics.db_path
+        
+        # File size
+        file_size = os.path.getsize(db_path) if db_path.exists() else 0
+        console.print(f"\n[bold]Database:[/bold] {db_path}")
+        console.print(f"[bold]File size:[/bold] {file_size / 1024 / 1024:.2f} MB")
+        
+        # Check WAL file size
+        wal_path = Path(str(db_path) + ".wal")
+        if wal_path.exists():
+            wal_size = os.path.getsize(wal_path)
+            console.print(f"[bold]WAL file:[/bold] {wal_size / 1024 / 1024:.2f} MB")
+        
+        # Table row counts
+        console.print("\n[bold]Table Statistics:[/bold]")
+        table = Table()
+        table.add_column("Table", style="cyan")
+        table.add_column("Rows", justify="right")
+        table.add_column("Est. Size", justify="right")
+        
+        tables = [
+            "sleep", "activities", "meals", "symptoms", "incidents",
+            "weather", "vitals", "medications", "supplements", 
+            "hydration", "daily_summary", "consultations"
+        ]
+        
+        total_rows = 0
+        for tbl in tables:
+            try:
+                result = analytics.conn.execute(f"SELECT COUNT(*) FROM {tbl}").fetchone()
+                count = result[0] if result else 0
+                total_rows += count
+                
+                # Estimate size (rough approximation)
+                if count > 0:
+                    # Get average row size by sampling
+                    try:
+                        size_result = analytics.conn.execute(f"""
+                            SELECT AVG(LENGTH(CAST(* AS VARCHAR))) FROM {tbl} LIMIT 100
+                        """).fetchone()
+                        avg_size = size_result[0] if size_result and size_result[0] else 100
+                        est_size = count * avg_size / 1024  # KB
+                        size_str = f"{est_size:.1f} KB" if est_size < 1024 else f"{est_size/1024:.2f} MB"
+                    except Exception:
+                        size_str = "-"
+                else:
+                    size_str = "0"
+                
+                table.add_row(tbl, str(count), size_str)
+            except Exception:
+                table.add_row(tbl, "-", "-")
+        
+        console.print(table)
+        console.print(f"\n[dim]Total rows: {total_rows}[/dim]")
+        
+        # Check consultations specifically (likely culprit)
+        try:
+            conv_result = analytics.conn.execute("""
+                SELECT COUNT(*), SUM(LENGTH(conversation_json)) / 1024.0 / 1024.0 as mb
+                FROM consultations 
+                WHERE conversation_json IS NOT NULL
+            """).fetchone()
+            if conv_result and conv_result[0] > 0:
+                console.print(f"\n[yellow]Conversation transcripts: {conv_result[0]} consultations, {conv_result[1]:.2f} MB[/yellow]")
+        except Exception:
+            pass
+        
+        if wal_path.exists() and wal_size > 1024 * 1024:  # > 1MB
+            console.print(f"\n[yellow]💡 Run 'diary db-compact' to reclaim WAL space[/yellow]")
+
+
+@app.command()
+def db_compact():
+    """Compact database and reclaim disk space."""
+    from .services.database import AnalyticsDB
+    import os
+    
+    with AnalyticsDB() as analytics:
+        db_path = analytics.db_path
+        
+        # Size before
+        size_before = os.path.getsize(db_path) if db_path.exists() else 0
+        wal_path = Path(str(db_path) + ".wal")
+        wal_before = os.path.getsize(wal_path) if wal_path.exists() else 0
+        
+        console.print(f"[dim]Before: {(size_before + wal_before) / 1024 / 1024:.2f} MB[/dim]")
+        
+        # Checkpoint and vacuum
+        console.print("Running CHECKPOINT...")
+        analytics.conn.execute("CHECKPOINT")
+        
+        console.print("Running VACUUM...")
+        analytics.conn.execute("VACUUM")
+        
+        # Size after
+        size_after = os.path.getsize(db_path) if db_path.exists() else 0
+        wal_after = os.path.getsize(wal_path) if wal_path.exists() else 0
+        
+        saved = (size_before + wal_before) - (size_after + wal_after)
+        console.print(f"[dim]After: {(size_after + wal_after) / 1024 / 1024:.2f} MB[/dim]")
+        
+        if saved > 0:
+            console.print(f"[green]✓ Reclaimed {saved / 1024 / 1024:.2f} MB[/green]")
+        else:
+            console.print("[yellow]Database already compact[/yellow]")
 
 
 if __name__ == "__main__":
