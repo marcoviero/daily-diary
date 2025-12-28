@@ -227,6 +227,10 @@ async def new_entry_form(
     # Sync caffeine/alcohol from quick_log to meals table (for calories tracking)
     _sync_quick_log_beverages(target_date, entry.quick_log, routines_service)
     
+    # Sync quick_log to DuckDB for analysis (caffeine/alcohol totals + checkbox factors)
+    with AnalyticsDB() as analytics:
+        analytics.sync_quick_log(target_date, entry.quick_log, quick_log_totals)
+    
     # Load meals from DuckDB (source of truth for meals) - after syncing beverages
     meals_with_ids = []
     with AnalyticsDB() as analytics:
@@ -701,20 +705,27 @@ async def transcribe_audio(
     """
     from ...services.transcription import TranscriptionService
     from ...services.diary_parser import DiaryParser
+    from ...utils.config import get_settings
     
+    settings = get_settings()
     target_date = datetime.strptime(entry_date, "%Y-%m-%d").date()
     
     # Check if any transcription method is available
-    transcription_service = TranscriptionService()
+    transcription_service = TranscriptionService(
+        settings=settings,
+        local_only=settings.transcription_local_only
+    )
     
     if not transcription_service.is_configured:
+        error_msg = "No transcription method available.\n\n"
+        if transcription_service._local_load_error:
+            error_msg += f"Local: {transcription_service._local_load_error}\n\n"
+        error_msg += "To fix: uv pip install faster-whisper"
+        if not settings.transcription_local_only:
+            error_msg += "\nOr: Add OPENAI_API_KEY to .env"
+        
         return JSONResponse(
-            {
-                "success": False, 
-                "error": "No transcription method available.\n\n"
-                         "Option 1 (free, local): pip install faster-whisper\n"
-                         "Option 2 (API): Add OPENAI_API_KEY to .env"
-            },
+            {"success": False, "error": error_msg},
             status_code=400
         )
     
@@ -895,6 +906,11 @@ async def update_quick_log(
             
             # Calculate updated totals
             totals = routines_service.calculate_totals(entry.quick_log)
+        
+        # Sync quick_log to DuckDB for analysis
+        from ...services.database import AnalyticsDB
+        with AnalyticsDB() as analytics:
+            analytics.sync_quick_log(target_date, entry.quick_log, totals)
         
         return JSONResponse({
             "success": True,

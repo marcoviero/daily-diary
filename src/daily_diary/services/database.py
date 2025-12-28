@@ -541,6 +541,24 @@ class AnalyticsDB:
             )
         """)
         
+        # ===== DAILY FACTORS TABLE =====
+        # Boolean/checkbox factors from quick_log (cat, sleep disruptions, etc.)
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS daily_factors (
+                entry_date DATE PRIMARY KEY,
+                
+                -- Sleep disruption factors
+                cat_in_room BOOLEAN DEFAULT FALSE,
+                cat_woke_me BOOLEAN DEFAULT FALSE,
+                
+                -- Add more boolean factors as needed
+                -- poor_sleep_quality BOOLEAN DEFAULT FALSE,
+                -- late_night_screen BOOLEAN DEFAULT FALSE,
+                
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
         # ===== CORRELATION CACHE TABLE =====
         # Pre-computed correlations for faster analysis
         self.conn.execute("""
@@ -629,12 +647,22 @@ class AnalyticsDB:
             "CREATE INDEX IF NOT EXISTS idx_vitals_date ON vitals(entry_date)",
             "CREATE INDEX IF NOT EXISTS idx_medications_date ON medications(entry_date)",
             "CREATE INDEX IF NOT EXISTS idx_hydration_date ON hydration(entry_date)",
+            "CREATE INDEX IF NOT EXISTS idx_daily_factors_date ON daily_factors(entry_date)",
         ]
         for idx in indexes:
             try:
                 self.conn.execute(idx)
             except Exception:
                 pass  # Index may already exist
+        
+        # Auto-migrate: add pressure_change column if missing (renamed from pressure_change_3h)
+        try:
+            self.conn.execute("SELECT pressure_change FROM weather LIMIT 1")
+        except Exception:
+            try:
+                self.conn.execute("ALTER TABLE weather ADD COLUMN pressure_change FLOAT")
+            except Exception:
+                pass  # Column may already exist under different scenario
     
     def upsert_entry(self, entry: DiaryEntry) -> None:
         """Insert or update a diary entry across all relevant tables."""
@@ -861,6 +889,88 @@ class AnalyticsDB:
             query += " WHERE " + " AND ".join(conditions)
         
         query += " ORDER BY entry_date"
+        
+        return self.conn.execute(query, params).df()
+    
+    def sync_quick_log(self, entry_date: date, quick_log: dict, totals: dict) -> None:
+        """
+        Sync quick_log data to DuckDB.
+        
+        Updates:
+        - daily_factors: boolean checkbox items (cat_in_room, cat_woke_me, etc.)
+        - daily_summary: caffeine and alcohol totals
+        """
+        # Update daily_factors with checkbox values
+        cat_in_room = quick_log.get('cat_in_room', 0) == 1
+        cat_woke_me = quick_log.get('cat_woke_me', 0) == 1
+        
+        self.conn.execute("""
+            INSERT OR REPLACE INTO daily_factors (
+                entry_date, cat_in_room, cat_woke_me, updated_at
+            ) VALUES (?, ?, ?, ?)
+        """, [entry_date, cat_in_room, cat_woke_me, datetime.now()])
+        
+        # Update daily_summary with caffeine/alcohol totals
+        caffeine_mg = totals.get('total_caffeine_mg', 0)
+        alcohol_units = totals.get('total_alcohol_units', 0)
+        
+        # First ensure the row exists
+        self.conn.execute("""
+            INSERT INTO daily_summary (entry_date, total_caffeine_mg, total_alcohol_units, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT (entry_date) DO UPDATE SET
+                total_caffeine_mg = excluded.total_caffeine_mg,
+                total_alcohol_units = excluded.total_alcohol_units,
+                updated_at = excluded.updated_at
+        """, [entry_date, caffeine_mg, alcohol_units, datetime.now()])
+        
+        self.conn.execute("CHECKPOINT")
+    
+    def get_analysis_data(
+        self,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> pd.DataFrame:
+        """
+        Get comprehensive daily data for correlation analysis.
+        
+        Joins daily_summary, daily_factors, and aggregated data.
+        """
+        query = """
+            SELECT 
+                ds.*,
+                df.cat_in_room,
+                df.cat_woke_me,
+                -- Nutrition from meals table
+                COALESCE(n.total_calories, 0) as nutrition_calories,
+                COALESCE(n.total_protein_g, 0) as nutrition_protein_g,
+                COALESCE(n.meal_caffeine_mg, 0) as meal_caffeine_mg
+            FROM daily_summary ds
+            LEFT JOIN daily_factors df ON ds.entry_date = df.entry_date
+            LEFT JOIN (
+                SELECT 
+                    entry_date,
+                    SUM(calories) as total_calories,
+                    SUM(protein_g) as total_protein_g,
+                    SUM(caffeine_mg) as meal_caffeine_mg
+                FROM meals
+                GROUP BY entry_date
+            ) n ON ds.entry_date = n.entry_date
+        """
+        conditions = []
+        params = []
+        
+        if start_date:
+            conditions.append("ds.entry_date >= ?")
+            params.append(start_date)
+        if end_date:
+            conditions.append("ds.entry_date <= ?")
+            params.append(end_date)
+        
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        
+        query += " ORDER BY ds.entry_date"
         
         return self.conn.execute(query, params).df()
     

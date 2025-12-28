@@ -68,10 +68,12 @@ class AnalysisService:
     - Food and alcohol consumption
     - Day of week patterns
     - Previous day's activities
+    - Sleep disruption factors (cat, etc.)
     """
     
-    def __init__(self, storage: Optional[DiaryStorage] = None):
+    def __init__(self, storage: Optional[DiaryStorage] = None, use_duckdb: bool = True):
         self.storage = storage or DiaryStorage()
+        self.use_duckdb = use_duckdb
     
     def build_dataframe(
         self,
@@ -80,8 +82,9 @@ class AnalysisService:
         min_days: int = 7,
     ) -> pd.DataFrame:
         """
-        Build a DataFrame from diary entries for analysis.
+        Build a DataFrame from diary data for analysis.
         
+        Uses DuckDB for comprehensive data if available, falls back to JSON.
         Each row is a day, columns are features.
         """
         if end_date is None:
@@ -89,6 +92,32 @@ class AnalysisService:
         if start_date is None:
             start_date = end_date - timedelta(days=90)
         
+        # Try DuckDB first for comprehensive data
+        if self.use_duckdb:
+            try:
+                from .database import AnalyticsDB
+                with AnalyticsDB() as db:
+                    df = db.get_analysis_data(start_date, end_date)
+                    if not df.empty and len(df) >= min_days:
+                        df['date'] = pd.to_datetime(df['entry_date'])
+                        df = df.set_index('date').sort_index()
+                        
+                        # Add derived columns
+                        df['day_of_week'] = df.index.dayofweek
+                        df['is_weekend'] = df['day_of_week'] >= 5
+                        
+                        # Add lagged features
+                        for col in ['total_activity_minutes', 'total_elevation_m', 
+                                    'total_alcohol_units', 'sleep_score', 'total_sleep_minutes',
+                                    'total_caffeine_mg', 'pressure_hpa']:
+                            if col in df.columns:
+                                df[f'{col}_prev_day'] = df[col].shift(1)
+                        
+                        return df
+            except Exception as e:
+                print(f"DuckDB analysis failed, falling back to JSON: {e}")
+        
+        # Fallback to JSON
         with self.storage as storage:
             entries = storage.get_entries_in_range(start_date, end_date)
         
@@ -210,21 +239,29 @@ class AnalysisService:
         # Factors to correlate against
         continuous_factors = [
             ('pressure_hpa', 'Barometric Pressure'),
+            ('pressure_change', 'Pressure Change (from yesterday)'),
             ('temp_avg_c', 'Average Temperature'),
             ('humidity_percent', 'Humidity'),
             ('sleep_score', 'Sleep Score'),
             ('total_sleep_hours', 'Total Sleep Duration'),
+            ('total_sleep_minutes', 'Total Sleep (minutes)'),
             ('deep_sleep_hours', 'Deep Sleep Duration'),
             ('hrv_average', 'Heart Rate Variability'),
             ('total_activity_minutes', 'Exercise Duration'),
             ('elevation_gain', 'Climbing (elevation)'),
+            ('total_elevation_m', 'Total Elevation'),
             ('avg_heart_rate', 'Average Exercise HR'),
             ('alcohol_units', 'Alcohol Consumption'),
+            ('total_alcohol_units', 'Total Alcohol Units'),
+            ('total_caffeine_mg', 'Caffeine (mg)'),
             ('stress_level', 'Stress Level'),
             ('energy_level', 'Energy Level'),
             ('total_activity_minutes_prev_day', 'Previous Day Exercise'),
             ('alcohol_units_prev_day', 'Previous Day Alcohol'),
+            ('total_alcohol_units_prev_day', 'Previous Day Alcohol'),
             ('sleep_score_prev_day', 'Previous Night Sleep Score'),
+            ('pressure_hpa_prev_day', 'Previous Day Pressure'),
+            ('total_caffeine_mg_prev_day', 'Previous Day Caffeine'),
         ]
         
         binary_factors = [
@@ -232,6 +269,8 @@ class AnalysisService:
             ('alcohol_consumed', 'Any Alcohol'),
             ('caffeine_consumed', 'Caffeine'),
             ('has_incidents', 'Had Incident'),
+            ('cat_in_room', 'Cat Slept in Room'),
+            ('cat_woke_me', 'Cat Woke Me Up'),
         ]
         
         target_series = df[target].dropna()

@@ -39,6 +39,14 @@ class RoutinesService:
                 {"id": "vitamin_d", "name": "Vitamin D", "dosage": "5000 IU", "default_count": 0},
                 {"id": "magnesium", "name": "Magnesium", "dosage": "400mg", "default_count": 0},
             ]
+        },
+        "sleep_factors": {
+            "title": "🐱 Sleep Factors",
+            "type": "checkbox",
+            "items": [
+                {"id": "cat_in_room", "name": "Cat slept in my room"},
+                {"id": "cat_woke_me", "name": "Cat woke me up"},
+            ]
         }
     }
     
@@ -77,6 +85,7 @@ class RoutinesService:
             result.append({
                 "id": category_id,
                 "title": category_data.get("title", category_id.title()),
+                "type": category_data.get("type", "counter"),  # 'counter' or 'checkbox'
                 "items": category_data.get("items", []),
             })
         return result

@@ -108,6 +108,12 @@ class DiaryStorage:
         entries.sort(key=lambda e: e.entry_date)
         return entries
     
+    def get_all_entries(self) -> list[DiaryEntry]:
+        """Get all entries in the database."""
+        entries = [DiaryEntry.model_validate(e) for e in self.db.all()]
+        entries.sort(key=lambda e: e.entry_date)
+        return entries
+    
     def search_entries(self, query: str) -> list[DiaryEntry]:
         """
         Search entries by text content.

@@ -755,5 +755,107 @@ def db_compact():
             console.print("[yellow]Database already compact[/yellow]")
 
 
+@app.command()
+def db_migrate():
+    """
+    Migrate database schema and backfill data from JSON entries.
+    
+    This command:
+    - Adds new tables (daily_factors) if missing
+    - Adds new columns (pressure_change) if missing
+    - Backfills quick_log data (cat factors, caffeine/alcohol totals) from JSON
+    """
+    from .services.database import AnalyticsDB
+    from .services.storage import DiaryStorage
+    from .services.routines import RoutinesService
+    
+    console.print("[bold]🔄 Database Migration[/bold]\n")
+    
+    with AnalyticsDB() as analytics:
+        # Step 1: Add daily_factors table if missing
+        console.print("Checking daily_factors table...")
+        try:
+            analytics.conn.execute("SELECT 1 FROM daily_factors LIMIT 1")
+            console.print("  [green]✓[/green] daily_factors exists")
+        except Exception:
+            console.print("  [yellow]Creating daily_factors table...[/yellow]")
+            analytics.conn.execute("""
+                CREATE TABLE IF NOT EXISTS daily_factors (
+                    entry_date DATE PRIMARY KEY,
+                    cat_in_room BOOLEAN DEFAULT FALSE,
+                    cat_woke_me BOOLEAN DEFAULT FALSE,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            console.print("  [green]✓[/green] Created daily_factors")
+        
+        # Step 2: Check/add pressure_change column in weather
+        console.print("Checking weather.pressure_change column...")
+        try:
+            analytics.conn.execute("SELECT pressure_change FROM weather LIMIT 1")
+            console.print("  [green]✓[/green] pressure_change exists")
+        except Exception:
+            console.print("  [yellow]Adding pressure_change column...[/yellow]")
+            try:
+                analytics.conn.execute("ALTER TABLE weather ADD COLUMN pressure_change FLOAT")
+                console.print("  [green]✓[/green] Added pressure_change")
+            except Exception:
+                console.print("  [dim]Column may already exist[/dim]")
+        
+        # Step 3: Backfill from JSON entries
+        console.print("\nBackfilling from JSON entries...")
+        routines = RoutinesService()
+        
+        entries_migrated = 0
+        factors_added = 0
+        summaries_updated = 0
+        
+        with DiaryStorage(sync_analytics=False) as storage:
+            entries = storage.get_all_entries()
+            
+            for entry in entries:
+                entries_migrated += 1
+                entry_date = entry.entry_date
+                
+                # Backfill daily_factors from quick_log
+                if entry.quick_log:
+                    cat_in_room = entry.quick_log.get('cat_in_room', 0) == 1
+                    cat_woke_me = entry.quick_log.get('cat_woke_me', 0) == 1
+                    
+                    if cat_in_room or cat_woke_me:
+                        analytics.conn.execute("""
+                            INSERT INTO daily_factors (entry_date, cat_in_room, cat_woke_me, updated_at)
+                            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                            ON CONFLICT (entry_date) DO UPDATE SET
+                                cat_in_room = excluded.cat_in_room,
+                                cat_woke_me = excluded.cat_woke_me,
+                                updated_at = excluded.updated_at
+                        """, [entry_date, cat_in_room, cat_woke_me])
+                        factors_added += 1
+                    
+                    # Calculate and store caffeine/alcohol totals
+                    totals = routines.calculate_totals(entry.quick_log)
+                    caffeine_mg = totals.get('total_caffeine_mg', 0)
+                    alcohol_units = totals.get('total_alcohol_units', 0)
+                    
+                    if caffeine_mg > 0 or alcohol_units > 0:
+                        analytics.conn.execute("""
+                            INSERT INTO daily_summary (entry_date, total_caffeine_mg, total_alcohol_units, updated_at)
+                            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                            ON CONFLICT (entry_date) DO UPDATE SET
+                                total_caffeine_mg = excluded.total_caffeine_mg,
+                                total_alcohol_units = excluded.total_alcohol_units,
+                                updated_at = excluded.updated_at
+                        """, [entry_date, caffeine_mg, alcohol_units])
+                        summaries_updated += 1
+        
+        analytics.conn.execute("CHECKPOINT")
+        
+        console.print(f"\n[green]✓ Migration complete![/green]")
+        console.print(f"  Entries processed: {entries_migrated}")
+        console.print(f"  Daily factors added: {factors_added}")
+        console.print(f"  Daily summaries updated: {summaries_updated}")
+
+
 if __name__ == "__main__":
     app()

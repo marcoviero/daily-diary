@@ -176,6 +176,7 @@ Start by greeting them warmly and asking what brings them in today."""
                 weather_data.append({
                     "date": entry.entry_date.isoformat(),
                     "pressure": w.pressure_hpa,
+                    "pressure_change": getattr(w, 'pressure_change_hpa', None),
                     "temp": w.temp_avg_c,
                     "description": w.description,
                 })
@@ -183,8 +184,15 @@ Start by greeting them warmly and asking what brings them in today."""
         if weather_data:
             context_parts.append("--- WEATHER/PRESSURE (Last 14 days) ---")
             for w in weather_data[-14:]:
+                pressure_str = f"{w['pressure']} hPa"
+                if w.get('pressure_change'):
+                    change = w['pressure_change']
+                    if change > 0:
+                        pressure_str += f" (↑{change:.1f})"
+                    elif change < 0:
+                        pressure_str += f" (↓{abs(change):.1f})"
                 context_parts.append(
-                    f"  {w['date']}: {w['pressure']} hPa, {w['temp']:.0f}°C, {w['description']}"
+                    f"  {w['date']}: {pressure_str}, {w['temp']:.0f}°C, {w['description']}"
                 )
             context_parts.append("")
         
@@ -272,6 +280,52 @@ Start by greeting them warmly and asking what brings them in today."""
             context_parts.append("--- RECENT NOTES ---")
             context_parts.extend(notes[-5:])
             context_parts.append("")
+        
+        # Quick Log factors from DuckDB (cat, caffeine totals, etc.)
+        try:
+            from .database import AnalyticsDB
+            with AnalyticsDB() as db:
+                factors_df = db.conn.execute("""
+                    SELECT entry_date, cat_in_room, cat_woke_me
+                    FROM daily_factors
+                    WHERE entry_date >= ? AND entry_date <= ?
+                    ORDER BY entry_date DESC
+                """, [start_date, end_date]).df()
+                
+                if not factors_df.empty:
+                    context_parts.append("--- SLEEP DISRUPTION FACTORS ---")
+                    for _, row in factors_df.head(14).iterrows():
+                        flags = []
+                        if row['cat_in_room']:
+                            flags.append("cat in room")
+                        if row['cat_woke_me']:
+                            flags.append("cat woke me")
+                        if flags:
+                            context_parts.append(f"  {row['entry_date']}: {', '.join(flags)}")
+                    context_parts.append("")
+                
+                # Also get caffeine/alcohol totals from daily_summary
+                totals_df = db.conn.execute("""
+                    SELECT entry_date, total_caffeine_mg, total_alcohol_units
+                    FROM daily_summary
+                    WHERE entry_date >= ? AND entry_date <= ?
+                      AND (total_caffeine_mg > 0 OR total_alcohol_units > 0)
+                    ORDER BY entry_date DESC
+                """, [start_date, end_date]).df()
+                
+                if not totals_df.empty:
+                    context_parts.append("--- CAFFEINE & ALCOHOL (from Quick Log) ---")
+                    for _, row in totals_df.head(14).iterrows():
+                        parts = [f"  {row['entry_date']}:"]
+                        if row['total_caffeine_mg'] and row['total_caffeine_mg'] > 0:
+                            parts.append(f"{row['total_caffeine_mg']:.0f}mg caffeine")
+                        if row['total_alcohol_units'] and row['total_alcohol_units'] > 0:
+                            parts.append(f"{row['total_alcohol_units']:.1f} alcohol units")
+                        context_parts.append(" ".join(parts))
+                    context_parts.append("")
+        except Exception as e:
+            # DuckDB not available or no data - continue without it
+            pass
         
         context_parts.append("=== END OF HEALTH DATA ===")
         

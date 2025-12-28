@@ -74,5 +74,19 @@
         "default_count": 0
       }
     ]
+  },
+  "sleep_factors": {
+    "title": "🐱 Sleep Factors",
+    "type": "checkbox",
+    "items": [
+      {
+        "id": "cat_in_room",
+        "name": "Cat slept in my room"
+      },
+      {
+        "id": "cat_woke_me",
+        "name": "Cat woke me up"
+      }
+    ]
   }
 }

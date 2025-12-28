@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     # OpenAI (optional - for Whisper API if faster-whisper not installed)
     openai_api_key: Optional[str] = None
     
+    # Transcription settings
+    transcription_local_only: bool = Field(default=True)  # Don't fall back to OpenAI
+    
     # Anthropic (for nutrition estimation and health advisor)
     anthropic_api_key: Optional[str] = None
     

@@ -205,12 +205,27 @@
             </div>
         </div>
         
-        <div class="grid md:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             {% for category in routine_categories %}
             <div class="bg-white rounded-lg p-4 shadow-sm">
                 <h3 class="font-medium text-gray-700 mb-3">{{ category.title }}</h3>
                 <div class="space-y-3">
                     {% for item in category['items'] %}
+                    {% if category.type == 'checkbox' %}
+                    {# Checkbox items #}
+                    {% set is_checked = entry.quick_log.get(item.id, 0)|int == 1 %}
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" 
+                               id="check-{{ item.id }}"
+                               {% if is_checked %}checked{% endif %}
+                               onchange="updateQuickLogCheckbox('{{ item.id }}', this.checked)"
+                               class="w-5 h-5 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                        <span class="{% if is_checked %}text-amber-700 font-medium{% else %}text-gray-700{% endif %}">
+                            {{ item.name }}
+                        </span>
+                    </label>
+                    {% else %}
+                    {# Counter items (default) #}
                     {% set item_count = entry.quick_log.get(item.id, item.default_count)|float %}
                     {% set increment = item.increment|default(1) %}
                     <div class="flex items-center justify-between">
@@ -239,6 +254,7 @@
                             </button>
                         </div>
                     </div>
+                    {% endif %}
                     {% endfor %}
                 </div>
             </div>
@@ -288,6 +304,38 @@
             }
         } catch (err) {
             console.error('Error updating quick log:', err);
+        }
+    }
+    
+    async function updateQuickLogCheckbox(itemId, isChecked) {
+        const checkEl = document.getElementById('check-' + itemId);
+        const labelSpan = checkEl.parentElement.querySelector('span');
+        
+        // Update label styling
+        if (isChecked) {
+            labelSpan.className = 'text-amber-700 font-medium';
+        } else {
+            labelSpan.className = 'text-gray-700';
+        }
+        
+        // Send to server (1 for checked, 0 for unchecked)
+        try {
+            const formData = new FormData();
+            formData.append('entry_date', '{{ entry.entry_date.isoformat() }}');
+            formData.append('item_id', itemId);
+            formData.append('count', isChecked ? 1 : 0);
+            
+            const response = await fetch('/entries/api/quick-log', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            if (!result.success) {
+                console.error('Failed to update checkbox');
+            }
+        } catch (err) {
+            console.error('Error updating quick log checkbox:', err);
         }
     }
     

@@ -20,11 +20,13 @@ class TranscriptionService:
     
     SUPPORTED_FORMATS = {".mp3", ".mp4", ".mpeg", ".mpga", ".m4a", ".wav", ".webm", ".ogg"}
     
-    def __init__(self, settings: Optional[Settings] = None):
+    def __init__(self, settings: Optional[Settings] = None, local_only: bool = False):
         self.settings = settings or get_settings()
+        self.local_only = local_only  # If True, never fall back to OpenAI
         self._openai_client = None
         self._local_model = None
         self._local_model_checked = False
+        self._local_load_error: Optional[str] = None
     
     @property
     def openai_client(self):
@@ -47,11 +49,13 @@ class TranscriptionService:
                 # Use 'base' model - good balance of speed/accuracy
                 # Options: tiny, base, small, medium, large-v2
                 self._local_model = WhisperModel("base", device="cpu", compute_type="int8")
-                print("Local Whisper model loaded successfully")
+                print("✓ Local Whisper model loaded successfully")
             except ImportError:
-                print("faster-whisper not installed. Install with: pip install faster-whisper")
+                self._local_load_error = "faster-whisper not installed. Install with: uv pip install faster-whisper"
+                print(f"⚠ {self._local_load_error}")
             except Exception as e:
-                print(f"Could not load local Whisper model: {e}")
+                self._local_load_error = f"Could not load local Whisper model: {e}"
+                print(f"⚠ {self._local_load_error}")
         return self._local_model
     
     @property
@@ -60,7 +64,7 @@ class TranscriptionService:
     
     @property
     def has_openai(self) -> bool:
-        return self.settings.openai_api_key is not None
+        return self.settings.openai_api_key is not None and not self.local_only
     
     @property
     def is_configured(self) -> bool:
@@ -100,6 +104,13 @@ class TranscriptionService:
                 if result:
                     return result
             
+            # If local-only mode, don't fall back to OpenAI
+            if self.local_only:
+                error_msg = "Local transcription failed."
+                if self._local_load_error:
+                    error_msg += f" {self._local_load_error}"
+                raise ValueError(error_msg)
+            
             # Fall back to OpenAI API
             if self.has_openai:
                 result = self._transcribe_openai(file_to_use)
@@ -109,7 +120,7 @@ class TranscriptionService:
             if not self.is_configured:
                 raise ValueError(
                     "No transcription method available. Either:\n"
-                    "1. Install faster-whisper: pip install faster-whisper\n"
+                    "1. Install faster-whisper: uv pip install faster-whisper\n"
                     "2. Set OPENAI_API_KEY in .env"
                 )
             
@@ -178,7 +189,13 @@ class TranscriptionService:
                 )
             return response
         except Exception as e:
-            raise RuntimeError(f"OpenAI Whisper API error: {e}")
+            error_str = str(e)
+            if "quota" in error_str.lower() or "exceeded" in error_str.lower():
+                raise RuntimeError(f"OpenAI API quota exceeded. Check your billing at platform.openai.com")
+            elif "invalid_api_key" in error_str.lower():
+                raise RuntimeError("Invalid OpenAI API key. Check OPENAI_API_KEY in .env")
+            else:
+                raise RuntimeError(f"OpenAI API error: {e}")
     
     def transcribe_with_timestamps(
         self,
@@ -219,8 +236,8 @@ class TranscriptionService:
             except Exception as e:
                 print(f"Local transcription error: {e}")
         
-        # Fall back to OpenAI
-        if self.has_openai:
+        # Fall back to OpenAI (unless local_only)
+        if self.has_openai and not self.local_only:
             try:
                 with open(audio_path, "rb") as audio_file:
                     response = self.openai_client.audio.transcriptions.create(

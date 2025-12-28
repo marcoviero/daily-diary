@@ -25,13 +25,11 @@ dependencies = [
     "pandas>=2.2.0",
     "scipy>=1.14.0",
     "plotly>=5.24.0",
+    # Local transcription (free, no API needed)
+    "faster-whisper>=1.0.0",
 ]
 
 [project.optional-dependencies]
-# Local transcription (no API needed)
-local-whisper = [
-    "faster-whisper>=1.0.0",
-]
 dev = [
     "pytest>=8.0.0",
     "ruff>=0.4.0",
