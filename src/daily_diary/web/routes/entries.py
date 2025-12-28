@@ -367,6 +367,27 @@ async def add_symptom(
     )
 
 
+@router.post("/symptom/delete")
+async def delete_symptom(
+    request: Request,
+    entry_date: str = Form(...),
+    symptom_index: int = Form(...),
+):
+    """Delete a symptom from an entry."""
+    target_date = datetime.strptime(entry_date, "%Y-%m-%d").date()
+    
+    with get_storage() as storage:
+        entry = storage.get_or_create_entry(target_date)
+        if 0 <= symptom_index < len(entry.symptoms):
+            entry.symptoms.pop(symptom_index)
+            storage.save_entry(entry)
+    
+    return RedirectResponse(
+        url=f"/entries/new?entry_date={entry_date}",
+        status_code=303,
+    )
+
+
 @router.post("/incident")
 async def add_incident(
     request: Request,
@@ -403,6 +424,27 @@ async def add_incident(
         entry = storage.get_or_create_entry(target_date)
         entry.add_incident(incident)
         storage.save_entry(entry)
+    
+    return RedirectResponse(
+        url=f"/entries/new?entry_date={entry_date}",
+        status_code=303,
+    )
+
+
+@router.post("/incident/delete")
+async def delete_incident(
+    request: Request,
+    entry_date: str = Form(...),
+    incident_index: int = Form(...),
+):
+    """Delete an incident from an entry."""
+    target_date = datetime.strptime(entry_date, "%Y-%m-%d").date()
+    
+    with get_storage() as storage:
+        entry = storage.get_or_create_entry(target_date)
+        if 0 <= incident_index < len(entry.incidents):
+            entry.incidents.pop(incident_index)
+            storage.save_entry(entry)
     
     return RedirectResponse(
         url=f"/entries/new?entry_date={entry_date}",
@@ -555,6 +597,48 @@ async def add_supplement(
         entry = storage.get_or_create_entry(target_date)
         entry.add_supplement(supplement)
         storage.save_entry(entry)
+    
+    return RedirectResponse(
+        url=f"/entries/new?entry_date={entry_date}",
+        status_code=303,
+    )
+
+
+@router.post("/medication/delete")
+async def delete_medication(
+    request: Request,
+    entry_date: str = Form(...),
+    medication_index: int = Form(...),
+):
+    """Delete a medication from an entry."""
+    target_date = datetime.strptime(entry_date, "%Y-%m-%d").date()
+    
+    with get_storage() as storage:
+        entry = storage.get_or_create_entry(target_date)
+        if 0 <= medication_index < len(entry.medications):
+            entry.medications.pop(medication_index)
+            storage.save_entry(entry)
+    
+    return RedirectResponse(
+        url=f"/entries/new?entry_date={entry_date}",
+        status_code=303,
+    )
+
+
+@router.post("/supplement/delete")
+async def delete_supplement(
+    request: Request,
+    entry_date: str = Form(...),
+    supplement_index: int = Form(...),
+):
+    """Delete a supplement from an entry."""
+    target_date = datetime.strptime(entry_date, "%Y-%m-%d").date()
+    
+    with get_storage() as storage:
+        entry = storage.get_or_create_entry(target_date)
+        if 0 <= supplement_index < len(entry.supplements):
+            entry.supplements.pop(supplement_index)
+            storage.save_entry(entry)
     
     return RedirectResponse(
         url=f"/entries/new?entry_date={entry_date}",
