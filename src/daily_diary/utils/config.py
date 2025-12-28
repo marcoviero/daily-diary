@@ -46,7 +46,8 @@ class Settings(BaseSettings):
     
     @property
     def has_weather(self) -> bool:
-        return self.openweather_api_key is not None
+        # Open-Meteo is free and requires no API key, just lat/lon
+        return self.default_latitude is not None and self.default_longitude is not None
     
     @property
     def has_strava(self) -> bool:

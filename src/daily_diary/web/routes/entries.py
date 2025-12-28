@@ -84,6 +84,75 @@ def _sync_quick_log_meds(entry, routines_service):
                     ))
 
 
+def _sync_quick_log_beverages(entry_date, quick_log, routines_service):
+    """Sync caffeine/alcohol quick_log items to meals table in DuckDB."""
+    from ...services.database import AnalyticsDB
+    
+    # Calorie estimates for beverages
+    BEVERAGE_CALORIES = {
+        'cappuccino': {'calories': 80, 'protein_g': 4, 'carbs_g': 6, 'fat_g': 4},  # with milk
+        'espresso': {'calories': 3, 'protein_g': 0, 'carbs_g': 0, 'fat_g': 0},
+        'pourover': {'calories': 5, 'protein_g': 0, 'carbs_g': 0, 'fat_g': 0},  # black coffee
+        'tallboy': {'calories': 200, 'protein_g': 2, 'carbs_g': 18, 'fat_g': 0},  # 16oz beer
+        'draft': {'calories': 180, 'protein_g': 2, 'carbs_g': 15, 'fat_g': 0},  # pint
+        'whisky': {'calories': 70, 'protein_g': 0, 'carbs_g': 0, 'fat_g': 0},  # per unit (shot)
+    }
+    
+    categories = routines_service.get_categories()
+    
+    with AnalyticsDB() as analytics:
+        # Delete existing quick_log-sourced beverages for this date
+        analytics.conn.execute("""
+            DELETE FROM meals 
+            WHERE entry_date = ? AND nutrition_source = 'quick_log'
+        """, [entry_date])
+        
+        # Add beverages based on quick_log counts
+        for cat in categories:
+            cat_id = cat.get('id')
+            if cat_id not in ('caffeine', 'alcohol'):
+                continue
+            
+            for item in cat.get('items', []):
+                item_id = item.get('id')
+                count = quick_log.get(item_id, 0)
+                
+                if count > 0:
+                    name = item.get('name')
+                    description = item.get('description', '')
+                    caffeine_mg = item.get('caffeine_mg', 0) * count
+                    alcohol_units = item.get('alcohol_units', 0) * count
+                    
+                    # Get calorie info
+                    cal_info = BEVERAGE_CALORIES.get(item_id, {})
+                    calories = cal_info.get('calories', 0) * count
+                    protein = cal_info.get('protein_g', 0) * count
+                    carbs = cal_info.get('carbs_g', 0) * count
+                    fat = cal_info.get('fat_g', 0) * count
+                    
+                    import uuid
+                    meal_id = str(uuid.uuid4())
+                    
+                    analytics.conn.execute("""
+                        INSERT INTO meals (
+                            id, entry_date, meal_type, description,
+                            calories, protein_g, carbs_g, fat_g,
+                            caffeine_mg, contains_caffeine,
+                            alcohol_units, contains_alcohol,
+                            nutrition_source
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, [
+                        meal_id, entry_date, 'beverage',
+                        f"{count}x {name}" if count > 1 else name,
+                        calories, protein, carbs, fat,
+                        caffeine_mg, caffeine_mg > 0,
+                        alcohol_units, alcohol_units > 0,
+                        'quick_log'
+                    ])
+        
+        analytics.conn.execute("CHECKPOINT")
+
+
 @router.get("/", response_class=HTMLResponse)
 async def list_entries(
     request: Request,
@@ -126,41 +195,6 @@ async def new_entry_form(
         previous_date = target_date - timedelta(days=1)
         previous_entry = storage.get_entry(previous_date)
     
-    # Load meals from DuckDB (source of truth for meals)
-    meals_with_ids = []
-    with AnalyticsDB() as analytics:
-        import pandas as pd
-        
-        meals_df = analytics.conn.execute("""
-            SELECT id, meal_type, description, time_consumed, 
-                   calories, protein_g, carbs_g, fat_g,
-                   contains_caffeine, contains_alcohol, alcohol_units
-            FROM meals
-            WHERE entry_date = ?
-            ORDER BY time_consumed ASC NULLS LAST, created_at ASC
-        """, [target_date]).df()
-        
-        if not meals_df.empty:
-            entry.meals = []
-            for _, row in meals_df.iterrows():
-                meal = Meal(
-                    meal_type=MealType(row['meal_type']) if pd.notna(row['meal_type']) else MealType.SNACK,
-                    description=row['description'] if pd.notna(row['description']) else "",
-                    time_consumed=row['time_consumed'] if pd.notna(row['time_consumed']) else None,
-                    calories=row['calories'] if pd.notna(row['calories']) else None,
-                    protein_g=row['protein_g'] if pd.notna(row['protein_g']) else None,
-                    carbs_g=row['carbs_g'] if pd.notna(row['carbs_g']) else None,
-                    fat_g=row['fat_g'] if pd.notna(row['fat_g']) else None,
-                    contains_caffeine=bool(row['contains_caffeine']) if pd.notna(row['contains_caffeine']) else False,
-                    contains_alcohol=bool(row['contains_alcohol']) if pd.notna(row['contains_alcohol']) else False,
-                    alcohol_units=row['alcohol_units'] if pd.notna(row['alcohol_units']) else None,
-                )
-                entry.meals.append(meal)
-                meals_with_ids.append({
-                    'id': row['id'],
-                    'meal': meal,
-                })
-    
     # Fetch integrations if not already present
     if not entry.integrations.weather:
         weather_client = WeatherClient()
@@ -189,6 +223,44 @@ async def new_entry_form(
     
     # Sync medicine/supplements from quick_log to medications/supplements lists
     _sync_quick_log_meds(entry, routines_service)
+    
+    # Sync caffeine/alcohol from quick_log to meals table (for calories tracking)
+    _sync_quick_log_beverages(target_date, entry.quick_log, routines_service)
+    
+    # Load meals from DuckDB (source of truth for meals) - after syncing beverages
+    meals_with_ids = []
+    with AnalyticsDB() as analytics:
+        import pandas as pd
+        
+        meals_df = analytics.conn.execute("""
+            SELECT id, meal_type, description, time_consumed, 
+                   calories, protein_g, carbs_g, fat_g,
+                   contains_caffeine, contains_alcohol, alcohol_units
+            FROM meals
+            WHERE entry_date = ?
+            ORDER BY nutrition_source ASC, time_consumed ASC NULLS LAST, created_at ASC
+        """, [target_date]).df()
+        
+        if not meals_df.empty:
+            entry.meals = []
+            for _, row in meals_df.iterrows():
+                meal = Meal(
+                    meal_type=MealType(row['meal_type']) if pd.notna(row['meal_type']) else MealType.SNACK,
+                    description=row['description'] if pd.notna(row['description']) else "",
+                    time_consumed=row['time_consumed'] if pd.notna(row['time_consumed']) else None,
+                    calories=row['calories'] if pd.notna(row['calories']) else None,
+                    protein_g=row['protein_g'] if pd.notna(row['protein_g']) else None,
+                    carbs_g=row['carbs_g'] if pd.notna(row['carbs_g']) else None,
+                    fat_g=row['fat_g'] if pd.notna(row['fat_g']) else None,
+                    contains_caffeine=bool(row['contains_caffeine']) if pd.notna(row['contains_caffeine']) else False,
+                    contains_alcohol=bool(row['contains_alcohol']) if pd.notna(row['contains_alcohol']) else False,
+                    alcohol_units=row['alcohol_units'] if pd.notna(row['alcohol_units']) else None,
+                )
+                entry.meals.append(meal)
+                meals_with_ids.append({
+                    'id': row['id'],
+                    'meal': meal,
+                })
     
     # Build previous day defaults for assessment
     prev_defaults = {
@@ -730,6 +802,9 @@ async def update_quick_log(
             
             # Sync medicine/supplements from quick_log to medications/supplements lists
             _sync_quick_log_meds(entry, routines_service)
+            
+            # Sync caffeine/alcohol from quick_log to meals table (for calories tracking)
+            _sync_quick_log_beverages(target_date, entry.quick_log, routines_service)
             
             entry.updated_at = datetime.now()
             storage.save_entry(entry)

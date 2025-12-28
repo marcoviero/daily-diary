@@ -32,19 +32,39 @@
                         {% if entry.integrations.weather.description %}
                         <p class="text-sm text-gray-600 capitalize">{{ entry.integrations.weather.description }}</p>
                         {% endif %}
-                        <p class="text-sm text-gray-500">{{ entry.integrations.weather.pressure_hpa|round|int }} hPa</p>
+                        <div class="flex items-center space-x-2 text-sm">
+                            <span class="text-gray-500">{{ entry.integrations.weather.pressure_hpa|round|int }} hPa</span>
+                            {% if entry.integrations.weather.pressure_change_hpa %}
+                                {% if entry.integrations.weather.pressure_change_hpa > 5 %}
+                                <span class="text-orange-600 font-medium">↑{{ entry.integrations.weather.pressure_change_hpa|round(1) }}</span>
+                                {% elif entry.integrations.weather.pressure_change_hpa < -5 %}
+                                <span class="text-blue-600 font-medium">↓{{ entry.integrations.weather.pressure_change_hpa|abs|round(1) }}</span>
+                                {% elif entry.integrations.weather.pressure_change_hpa > 0 %}
+                                <span class="text-gray-500">+{{ entry.integrations.weather.pressure_change_hpa|round(1) }}</span>
+                                {% else %}
+                                <span class="text-gray-500">{{ entry.integrations.weather.pressure_change_hpa|round(1) }}</span>
+                                {% endif %}
+                            {% endif %}
+                        </div>
                         <p class="text-xs text-blue-500 mt-2">Click for details ▼</p>
                     </div>
                     <!-- Details (hidden by default) -->
                     <div class="details hidden mt-3 pt-3 border-t text-sm text-gray-500 space-y-1">
                         {% if entry.integrations.weather.temp_high_c and entry.integrations.weather.temp_low_c %}
-                        <p>↑ {{ entry.integrations.weather.temp_high_c|round|int }}°C / ↓ {{ entry.integrations.weather.temp_low_c|round|int }}°C</p>
+                        <p>High/Low: <strong>{{ entry.integrations.weather.temp_high_c|round|int }}°C</strong> / {{ entry.integrations.weather.temp_low_c|round|int }}°C</p>
                         {% endif %}
                         {% if entry.integrations.weather.pressure_hpa %}
-                        <p>Pressure: <strong>{{ entry.integrations.weather.pressure_hpa|round|int }}</strong> hPa</p>
+                        <p>Pressure: <strong>{{ entry.integrations.weather.pressure_hpa|round|int }}</strong> hPa
+                            {% if entry.integrations.weather.pressure_change_hpa %}
+                            ({% if entry.integrations.weather.pressure_change_hpa > 0 %}+{% endif %}{{ entry.integrations.weather.pressure_change_hpa|round(1) }} from yesterday)
+                            {% endif %}
+                        </p>
                         {% endif %}
                         {% if entry.integrations.weather.humidity_percent %}
                         <p>Humidity: {{ entry.integrations.weather.humidity_percent }}%</p>
+                        {% endif %}
+                        {% if entry.integrations.weather.precipitation_mm and entry.integrations.weather.precipitation_mm > 0 %}
+                        <p>Precipitation: {{ entry.integrations.weather.precipitation_mm|round(1) }} mm</p>
                         {% endif %}
                         {% if entry.integrations.weather.wind_speed_kmh %}
                         <p>Wind: {{ entry.integrations.weather.wind_speed_kmh|round(1) }} km/h</p>

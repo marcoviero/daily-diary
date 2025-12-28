@@ -272,7 +272,7 @@ class AnalyticsDB:
                 -- Atmospheric
                 pressure_hpa FLOAT,
                 pressure_trend VARCHAR,  -- 'rising', 'falling', 'stable'
-                pressure_change_3h FLOAT,  -- change over 3 hours
+                pressure_change FLOAT,  -- change from previous day
                 humidity_percent INTEGER,
                 
                 -- Wind
@@ -692,16 +692,18 @@ class AnalyticsDB:
         # ===== WEATHER =====
         if entry.integrations.weather:
             w = entry.integrations.weather
-            weather_id = f"weather_{entry_date.isoformat()}_owm"
-            self.conn.execute("DELETE FROM weather WHERE id = ?", [weather_id])
+            weather_id = f"weather_{entry_date.isoformat()}"
+            self.conn.execute("DELETE FROM weather WHERE entry_date = ?", [entry_date])
             self.conn.execute("""
                 INSERT INTO weather (
                     id, entry_date, temp_c, temp_high_c, temp_low_c,
-                    pressure_hpa, humidity_percent, wind_speed_kmh, description, source
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    pressure_hpa, pressure_change, humidity_percent, 
+                    precipitation_mm, wind_speed_kmh, description, source
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, [
                 weather_id, entry_date, w.temp_avg_c, w.temp_high_c, w.temp_low_c,
-                w.pressure_hpa, w.humidity_percent, w.wind_speed_kmh, w.description, 'openweathermap'
+                w.pressure_hpa, w.pressure_change_hpa, w.humidity_percent,
+                w.precipitation_mm, w.wind_speed_kmh, w.description, 'open-meteo'
             ])
         
         # ===== MEALS =====
