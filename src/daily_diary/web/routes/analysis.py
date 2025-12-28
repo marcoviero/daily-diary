@@ -34,6 +34,7 @@ async def analysis_dashboard(
     )
     patterns = service.find_symptom_patterns(start_date, end_date)
     chart_data = service.generate_chart_data(start_date, end_date)
+    medication_analysis = service.analyze_medication_effectiveness(start_date, end_date)
     
     # Filter to significant correlations for display
     significant_correlations = [c for c in correlations if c.is_significant]
@@ -48,6 +49,7 @@ async def analysis_dashboard(
             "significant_correlations": significant_correlations,
             "patterns": patterns,
             "chart_data": chart_data,
+            "medication_analysis": medication_analysis,
         },
     )
 

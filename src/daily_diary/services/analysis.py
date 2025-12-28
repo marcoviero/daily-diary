@@ -485,3 +485,151 @@ class AnalysisService:
             }
         
         return charts
+    
+    def analyze_medication_effectiveness(
+        self,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> list[dict]:
+        """
+        Analyze medication effectiveness for rescue medications.
+        
+        For each medication found in the data:
+        - Count times taken
+        - Compare headache severity on days with/without medication
+        - Look for same-day relief patterns (if timestamps available)
+        
+        Returns list of medication analysis results.
+        """
+        from .database import AnalyticsDB
+        
+        if end_date is None:
+            end_date = date.today()
+        if start_date is None:
+            start_date = end_date - timedelta(days=90)
+        
+        results = []
+        
+        try:
+            with AnalyticsDB() as db:
+                # Get all medications
+                meds_df = db.conn.execute("""
+                    SELECT 
+                        entry_date,
+                        name,
+                        dosage,
+                        time_taken,
+                        reason
+                    FROM medications
+                    WHERE entry_date >= ? AND entry_date <= ?
+                    ORDER BY entry_date, time_taken
+                """, [start_date, end_date]).df()
+                
+                if meds_df.empty:
+                    return []
+                
+                # Get all symptoms (focus on headaches)
+                symptoms_df = db.conn.execute("""
+                    SELECT 
+                        entry_date,
+                        symptom_type,
+                        severity,
+                        onset_time
+                    FROM symptoms
+                    WHERE entry_date >= ? AND entry_date <= ?
+                    ORDER BY entry_date, onset_time
+                """, [start_date, end_date]).df()
+                
+                # Get all dates in range for baseline comparison
+                all_dates_df = db.conn.execute("""
+                    SELECT DISTINCT entry_date 
+                    FROM daily_summary
+                    WHERE entry_date >= ? AND entry_date <= ?
+                """, [start_date, end_date]).df()
+                
+                all_dates = set(all_dates_df['entry_date'].tolist()) if not all_dates_df.empty else set()
+                
+                # Analyze each unique medication
+                for med_name in meds_df['name'].str.lower().unique():
+                    med_rows = meds_df[meds_df['name'].str.lower() == med_name]
+                    
+                    # Days this medication was taken
+                    med_dates = set(med_rows['entry_date'].tolist())
+                    times_taken = len(med_rows)
+                    
+                    # Get typical dosage
+                    dosages = med_rows['dosage'].dropna().unique()
+                    typical_dosage = dosages[0] if len(dosages) > 0 else None
+                    
+                    # Headache analysis
+                    headache_types = ['headache', 'headache_neuralgiaform', 'neuralgiaform_headache']
+                    headaches = symptoms_df[symptoms_df['symptom_type'].str.lower().isin(headache_types)]
+                    
+                    # Severity on med days vs non-med days
+                    headache_on_med_days = headaches[headaches['entry_date'].isin(med_dates)]
+                    headache_on_other_days = headaches[~headaches['entry_date'].isin(med_dates)]
+                    
+                    avg_severity_med_days = headache_on_med_days['severity'].mean() if len(headache_on_med_days) > 0 else None
+                    avg_severity_other_days = headache_on_other_days['severity'].mean() if len(headache_on_other_days) > 0 else None
+                    
+                    # Days with headache
+                    headache_dates = set(headaches['entry_date'].tolist())
+                    days_with_med_and_headache = len(med_dates & headache_dates)
+                    
+                    # Calculate response (did they take it for headache and was severity lower than baseline?)
+                    effectiveness_notes = []
+                    
+                    if times_taken >= 3:  # Need enough data points
+                        if avg_severity_med_days is not None and avg_severity_other_days is not None:
+                            if avg_severity_med_days < avg_severity_other_days:
+                                diff = avg_severity_other_days - avg_severity_med_days
+                                effectiveness_notes.append(
+                                    f"Headaches on {med_name.title()} days average {diff:.1f} points lower severity"
+                                )
+                            elif avg_severity_med_days > avg_severity_other_days:
+                                # This is expected - you take rescue meds for worse headaches
+                                effectiveness_notes.append(
+                                    f"Taken for more severe headaches (avg {avg_severity_med_days:.1f}/10 vs baseline {avg_severity_other_days:.1f}/10)"
+                                )
+                    
+                    # Same-day relief analysis (if we have timestamps)
+                    relief_cases = 0
+                    no_relief_cases = 0
+                    
+                    for med_date in med_dates:
+                        day_meds = med_rows[med_rows['entry_date'] == med_date]
+                        day_headaches = headache_on_med_days[headache_on_med_days['entry_date'] == med_date]
+                        
+                        if len(day_headaches) >= 2:
+                            # Multiple symptom entries - check if severity decreased
+                            severities = day_headaches.sort_values('onset_time')['severity'].tolist()
+                            if len(severities) >= 2 and severities[-1] < severities[0]:
+                                relief_cases += 1
+                            elif len(severities) >= 2 and severities[-1] >= severities[0]:
+                                no_relief_cases += 1
+                    
+                    if relief_cases + no_relief_cases > 0:
+                        relief_rate = relief_cases / (relief_cases + no_relief_cases) * 100
+                        effectiveness_notes.append(
+                            f"Same-day relief observed {relief_rate:.0f}% of tracked cases ({relief_cases}/{relief_cases + no_relief_cases})"
+                        )
+                    
+                    results.append({
+                        'medication': med_name.title(),
+                        'dosage': typical_dosage,
+                        'times_taken': times_taken,
+                        'days_taken': len(med_dates),
+                        'days_with_headache': days_with_med_and_headache,
+                        'avg_severity_med_days': round(avg_severity_med_days, 1) if avg_severity_med_days else None,
+                        'avg_severity_baseline': round(avg_severity_other_days, 1) if avg_severity_other_days else None,
+                        'effectiveness_notes': effectiveness_notes,
+                        'data_quality': 'good' if times_taken >= 5 else 'limited' if times_taken >= 3 else 'insufficient',
+                    })
+                
+                # Sort by times taken (most used first)
+                results.sort(key=lambda x: x['times_taken'], reverse=True)
+                
+        except Exception as e:
+            print(f"Medication analysis error: {e}")
+        
+        return results

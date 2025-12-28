@@ -245,6 +245,49 @@ Start by greeting them warmly and asking what brings them in today."""
                 context_parts.append(f"  {m['date']}: {m['meal']} ({', '.join(flags)})")
             context_parts.append("")
         
+        # Medications taken
+        all_medications = []
+        for entry in entries:
+            for med in entry.medications:
+                all_medications.append({
+                    "date": entry.entry_date.isoformat(),
+                    "name": med.name,
+                    "dosage": med.dosage,
+                    "reason": med.reason,
+                    "time": str(med.time_taken) if med.time_taken else None,
+                })
+        
+        if all_medications:
+            context_parts.append("--- MEDICATIONS TAKEN ---")
+            for m in all_medications[-15:]:
+                time_str = f" at {m['time']}" if m['time'] else ""
+                reason_str = f" for {m['reason']}" if m['reason'] else ""
+                context_parts.append(f"  {m['date']}: {m['name']} {m['dosage'] or ''}{time_str}{reason_str}")
+            if len(all_medications) > 15:
+                context_parts.append(f"  ... and {len(all_medications) - 15} more medications")
+            context_parts.append("")
+        
+        # Medication effectiveness analysis
+        try:
+            from .analysis import AnalysisService
+            analysis = AnalysisService()
+            med_analysis = analysis.analyze_medication_effectiveness(start_date, end_date)
+            
+            if med_analysis:
+                context_parts.append("--- MEDICATION EFFECTIVENESS ANALYSIS ---")
+                for med in med_analysis[:5]:  # Top 5 medications
+                    context_parts.append(f"  {med['medication']} ({med['dosage'] or 'various doses'}):")
+                    context_parts.append(f"    Times taken: {med['times_taken']}, Data quality: {med['data_quality']}")
+                    if med['avg_severity_med_days'] is not None:
+                        context_parts.append(f"    Avg severity on med days: {med['avg_severity_med_days']}/10")
+                    if med['avg_severity_baseline'] is not None:
+                        context_parts.append(f"    Avg severity baseline: {med['avg_severity_baseline']}/10")
+                    for note in med.get('effectiveness_notes', []):
+                        context_parts.append(f"    → {note}")
+                context_parts.append("")
+        except Exception:
+            pass  # Analysis not available
+        
         # Wellbeing scores
         wellbeing_data = []
         for entry in entries:

@@ -104,6 +104,75 @@
 </div>
 {% endif %}
 
+<!-- Medication Effectiveness -->
+{% if medication_analysis %}
+<div class="bg-white rounded-xl shadow p-6 mb-6">
+    <h2 class="text-xl font-semibold mb-4">💊 Medication Effectiveness</h2>
+    <p class="text-sm text-gray-500 mb-4">Analysis of rescue medications and their relationship to symptoms</p>
+    
+    <div class="space-y-4">
+        {% for med in medication_analysis %}
+        <div class="border rounded-lg p-4 {% if med.data_quality == 'good' %}border-blue-200 bg-blue-50{% elif med.data_quality == 'limited' %}border-yellow-200 bg-yellow-50{% else %}border-gray-200 bg-gray-50{% endif %}">
+            <div class="flex justify-between items-start mb-2">
+                <div>
+                    <span class="font-medium text-lg">{{ med.medication }}</span>
+                    {% if med.dosage %}
+                    <span class="ml-2 text-sm text-gray-500">{{ med.dosage }}</span>
+                    {% endif %}
+                </div>
+                <div class="text-right">
+                    <span class="text-sm px-2 py-1 rounded
+                        {% if med.data_quality == 'good' %}bg-green-100 text-green-800
+                        {% elif med.data_quality == 'limited' %}bg-yellow-100 text-yellow-800
+                        {% else %}bg-gray-100 text-gray-600{% endif %}">
+                        {{ med.data_quality }} data
+                    </span>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3 text-sm">
+                <div>
+                    <span class="text-gray-500">Times taken:</span>
+                    <span class="font-medium ml-1">{{ med.times_taken }}</span>
+                </div>
+                <div>
+                    <span class="text-gray-500">Days used:</span>
+                    <span class="font-medium ml-1">{{ med.days_taken }}</span>
+                </div>
+                {% if med.avg_severity_med_days %}
+                <div>
+                    <span class="text-gray-500">Severity (med days):</span>
+                    <span class="font-medium ml-1">{{ med.avg_severity_med_days }}/10</span>
+                </div>
+                {% endif %}
+                {% if med.avg_severity_baseline %}
+                <div>
+                    <span class="text-gray-500">Baseline severity:</span>
+                    <span class="font-medium ml-1">{{ med.avg_severity_baseline }}/10</span>
+                </div>
+                {% endif %}
+            </div>
+            
+            {% if med.effectiveness_notes %}
+            <div class="space-y-1">
+                {% for note in med.effectiveness_notes %}
+                <p class="text-sm text-gray-700">📊 {{ note }}</p>
+                {% endfor %}
+            </div>
+            {% elif med.data_quality == 'insufficient' %}
+            <p class="text-sm text-gray-500 italic">Need more data points (at least 3) for analysis</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    
+    <div class="mt-4 p-3 bg-gray-100 rounded text-sm text-gray-600">
+        <strong>💡 Tip:</strong> Log medications with timestamps and reasons for better analysis. 
+        Example: "Took 25mg indomethacin at 2pm for headache severity 7"
+    </div>
+</div>
+{% endif %}
+
 <!-- All Correlations Table -->
 {% if correlations %}
 <div class="bg-white rounded-xl shadow p-6 mb-6">

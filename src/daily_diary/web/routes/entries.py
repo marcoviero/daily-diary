@@ -781,7 +781,7 @@ async def transcribe_audio(
             # If we parsed successfully, apply the extracted data
             if parsed_data and parsed_data.get("success"):
                 parser = DiaryParser()
-                parse_summary = parser.apply_to_entry(parsed_data, entry)
+                parse_summary = parser.apply_to_entry(parsed_data, entry, entry_date=target_date)
             
             entry.updated_at = datetime.now()
             storage.save_entry(entry)

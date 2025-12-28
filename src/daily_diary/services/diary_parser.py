@@ -398,13 +398,14 @@ Return ONLY the JSON object, no other text."""
         
         return None
     
-    def apply_to_entry(self, parsed_data: dict, entry) -> dict:
+    def apply_to_entry(self, parsed_data: dict, entry, entry_date=None) -> dict:
         """
         Apply parsed data to a diary entry.
         
         Args:
             parsed_data: Result from parse()
             entry: DiaryEntry to update
+            entry_date: Date for database operations (required for meals)
             
         Returns:
             Summary of what was added
@@ -421,10 +422,80 @@ Return ONLY the JSON object, no other text."""
             "wellbeing_updated": False,
         }
         
-        # Add meals
-        for meal in parsed_data.get("meals", []):
-            entry.add_meal(meal)
-            summary["meals_added"] += 1
+        # Add meals - these go to DuckDB, not JSON
+        if parsed_data.get("meals") and entry_date:
+            from .database import AnalyticsDB
+            from .nutrition import NutritionEstimator
+            
+            estimator = NutritionEstimator()
+            
+            with AnalyticsDB() as db:
+                for meal in parsed_data.get("meals", []):
+                    # Get nutrition from parsed data or estimate
+                    if isinstance(meal, Meal):
+                        description = meal.description
+                        meal_type = meal.meal_type.value if meal.meal_type else "snack"
+                        time_consumed = meal.time_consumed
+                        notes = meal.notes
+                        
+                        # Use parsed nutrition or estimate
+                        nutrition = {
+                            'calories': meal.calories,
+                            'protein_g': meal.protein_g,
+                            'carbs_g': meal.carbs_g,
+                            'fat_g': meal.fat_g,
+                            'fiber_g': meal.fiber_g,
+                            'caffeine_mg': None,
+                            'alcohol_units': meal.alcohol_units,
+                            'estimation_confidence': 'parsed',
+                            'reasoning': 'Extracted from voice note',
+                        }
+                        
+                        # If no nutrition data, estimate it
+                        if not nutrition['calories']:
+                            estimated = estimator.estimate(description)
+                            nutrition.update(estimated)
+                    else:
+                        # Dict from parser
+                        description = meal.get('description', '')
+                        meal_type = meal.get('meal_type', 'snack')
+                        notes = meal.get('notes')
+                        
+                        # Parse time string to time object
+                        time_consumed = None
+                        time_str = meal.get('time')
+                        if time_str:
+                            try:
+                                from datetime import datetime as dt
+                                time_consumed = dt.strptime(time_str, "%H:%M").time()
+                            except (ValueError, TypeError):
+                                pass
+                        
+                        nutrition = {
+                            'calories': meal.get('calories'),
+                            'protein_g': meal.get('protein_g'),
+                            'carbs_g': meal.get('carbs_g'),
+                            'fat_g': meal.get('fat_g'),
+                            'fiber_g': meal.get('fiber_g'),
+                            'caffeine_mg': None,
+                            'alcohol_units': meal.get('alcohol_units'),
+                            'estimation_confidence': 'parsed',
+                            'reasoning': 'Extracted from voice note',
+                        }
+                        
+                        if not nutrition['calories']:
+                            estimated = estimator.estimate(description)
+                            nutrition.update(estimated)
+                    
+                    db.add_meal_with_nutrition(
+                        entry_date=entry_date,
+                        meal_type=meal_type,
+                        description=description,
+                        nutrition=nutrition,
+                        time_consumed=time_consumed,
+                        notes=notes,
+                    )
+                    summary["meals_added"] += 1
         
         # Add medications
         for med in parsed_data.get("medications", []):
