@@ -396,23 +396,67 @@
     }
     </script>
     
-    <!-- Voice Recording Section -->
-    <div class="bg-purple-900/30 rounded-xl p-6 mb-6">
-        <div class="flex justify-between items-center">
-            <h2 class="text-lg font-semibold text-purple-800">🎤 Voice Notes</h2>
-            <button type="button" onclick="openRecordingModal()" 
-                    class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center space-x-2">
-                <span>Record Voice Note</span>
-            </button>
+    <!-- Voice Notes & Daily Assessment Combined -->
+    <div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
+        <div class="grid md:grid-cols-2 gap-6">
+            <!-- Voice Notes -->
+            <div>
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-lg font-semibold text-purple-400">🎤 Voice Notes</h2>
+                    <button type="button" onclick="openRecordingModal()" 
+                            class="bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 text-sm">
+                        Record
+                    </button>
+                </div>
+                <p class="text-sm text-slate-400 mb-2">Record a voice note — it will be transcribed and parsed.</p>
+                {% if entry.general_notes %}
+                <div class="p-3 bg-slate-900 rounded-lg text-sm">
+                    <p class="text-slate-300">{{ entry.general_notes[:200] }}{% if entry.general_notes|length > 200 %}...{% endif %}</p>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Daily Assessment -->
+            <div>
+                <h2 class="text-lg font-semibold mb-3">📊 Daily Assessment</h2>
+                <form action="/entries/save" method="post">
+                    <input type="hidden" name="entry_date" value="{{ entry.entry_date.isoformat() }}">
+                    
+                    {% set wellbeing_val = entry.overall_wellbeing or prev_defaults.overall_wellbeing or 5 %}
+                    {% set energy_val = entry.energy_level or prev_defaults.energy_level or 5 %}
+                    {% set stress_val = entry.stress_level or prev_defaults.stress_level or 5 %}
+                    
+                    <div class="space-y-3">
+                        <div class="flex items-center space-x-3">
+                            <label class="text-sm text-slate-400 w-20">Wellbeing</label>
+                            <input type="range" name="overall_wellbeing" min="1" max="10" value="{{ wellbeing_val }}"
+                                   class="flex-grow" oninput="this.nextElementSibling.textContent = this.value">
+                            <span class="text-lg font-bold text-indigo-400 w-8">{{ wellbeing_val }}</span>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <label class="text-sm text-slate-400 w-20">Energy</label>
+                            <input type="range" name="energy_level" min="1" max="10" value="{{ energy_val }}"
+                                   class="flex-grow" oninput="this.nextElementSibling.textContent = this.value">
+                            <span class="text-lg font-bold text-indigo-400 w-8">{{ energy_val }}</span>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <label class="text-sm text-slate-400 w-20">Stress</label>
+                            <input type="range" name="stress_level" min="1" max="10" value="{{ stress_val }}"
+                                   class="flex-grow" oninput="this.nextElementSibling.textContent = this.value">
+                            <span class="text-lg font-bold text-indigo-400 w-8">{{ stress_val }}</span>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <textarea name="general_notes" rows="2" 
+                                      class="flex-grow border border-slate-600 rounded px-2 py-1 text-sm"
+                                      placeholder="Notes...">{{ entry.general_notes or '' }}</textarea>
+                            <button type="submit" class="bg-indigo-600 text-white px-3 py-1.5 rounded hover:bg-indigo-700 text-sm">
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
         </div>
-        <p class="text-sm text-purple-600 mt-2">Record a voice note about your day — it will be transcribed and added to your notes.</p>
-        
-        {% if entry.general_notes %}
-        <div class="mt-4 p-4 bg-slate-800 rounded-lg">
-            <h4 class="font-medium text-slate-300 mb-2">Current Notes:</h4>
-            <p class="text-slate-400">{{ entry.general_notes }}</p>
-        </div>
-        {% endif %}
     </div>
     
     <!-- Recording Modal -->
@@ -624,249 +668,133 @@
     }
     </script>
     
-    <!-- Daily Assessment -->
-    <div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
-        <h2 class="text-xl font-semibold mb-4">📊 Daily Assessment</h2>
-        <form action="/entries/save" method="post">
-            <input type="hidden" name="entry_date" value="{{ entry.entry_date.isoformat() }}">
+    <!-- Symptoms & Incidents Side-by-Side -->
+    <div class="grid md:grid-cols-2 gap-4 mb-6">
+        <!-- Symptoms -->
+        <div class="bg-slate-800 rounded-xl shadow p-4">
+            <h2 class="text-lg font-semibold mb-3">🤕 Symptoms</h2>
             
-            {% set wellbeing_val = entry.overall_wellbeing or prev_defaults.overall_wellbeing or 5 %}
-            {% set energy_val = entry.energy_level or prev_defaults.energy_level or 5 %}
-            {% set stress_val = entry.stress_level or prev_defaults.stress_level or 5 %}
-            
-            <div class="grid md:grid-cols-3 gap-6 mb-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-300 mb-2">
-                        Overall Wellbeing (1-10)
-                    </label>
-                    <input type="range" name="overall_wellbeing" 
-                           min="1" max="10" 
-                           value="{{ wellbeing_val }}"
-                           class="w-full"
-                           oninput="this.nextElementSibling.textContent = this.value">
-                    <span class="text-lg font-bold text-indigo-400">{{ wellbeing_val }}</span>
-                    {% if not entry.overall_wellbeing and prev_defaults.overall_wellbeing %}
-                    <span class="text-xs text-slate-500 ml-2">(from yesterday)</span>
-                    {% endif %}
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-slate-300 mb-2">
-                        Energy Level (1-10)
-                    </label>
-                    <input type="range" name="energy_level" 
-                           min="1" max="10" 
-                           value="{{ energy_val }}"
-                           class="w-full"
-                           oninput="this.nextElementSibling.textContent = this.value">
-                    <span class="text-lg font-bold text-indigo-400">{{ energy_val }}</span>
-                    {% if not entry.energy_level and prev_defaults.energy_level %}
-                    <span class="text-xs text-slate-500 ml-2">(from yesterday)</span>
-                    {% endif %}
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-slate-300 mb-2">
-                        Stress Level (1-10)
-                    </label>
-                    <input type="range" name="stress_level" 
-                           min="1" max="10" 
-                           value="{{ stress_val }}"
-                           class="w-full"
-                           oninput="this.nextElementSibling.textContent = this.value">
-                    <span class="text-lg font-bold text-indigo-400">{{ stress_val }}</span>
-                    {% if not entry.stress_level and prev_defaults.stress_level %}
-                    <span class="text-xs text-slate-500 ml-2">(from yesterday)</span>
-                    {% endif %}
-                </div>
-            </div>
-            
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-slate-300 mb-2">Notes</label>
-                <textarea name="general_notes" rows="3" 
-                          class="w-full border border-slate-600 rounded-lg px-3 py-2"
-                          placeholder="How are you feeling today?">{{ entry.general_notes or '' }}</textarea>
-            </div>
-            
-            <button type="submit" 
-                    class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700">
-                Save Assessment
-            </button>
-        </form>
-    </div>
-    
-    <!-- Symptoms Section -->
-    <div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
-        <h2 class="text-xl font-semibold mb-4">🤕 Symptoms</h2>
-        
-        {% if entry.symptoms %}
-        <div class="mb-4 space-y-2">
-            {% for symptom in entry.symptoms %}
-            <div class="flex items-center justify-between p-3 rounded-lg severity-{{ symptom.severity.value }}">
-                <div class="flex-grow">
-                    <span class="font-medium">{{ symptom.display_type }}</span>
-                    {% if symptom.display_location %}
-                    <span class="text-slate-400">- {{ symptom.display_location }}</span>
-                    {% endif %}
-                    {% if symptom.onset_time %}
-                    <span class="text-sm text-slate-400 ml-2">at {{ symptom.onset_time.strftime('%H:%M') }}</span>
-                    {% endif %}
-                    {% if symptom.notes %}
-                    <p class="text-sm text-slate-400">{{ symptom.notes }}</p>
-                    {% endif %}
-                </div>
-                <div class="flex items-center space-x-3">
-                    <span class="text-lg font-bold">{{ symptom.severity.value }}/10</span>
-                    <form action="/entries/symptom/delete" method="post" class="inline"
-                          onsubmit="return confirm('Delete this symptom?');">
-                        <input type="hidden" name="entry_date" value="{{ entry.entry_date.isoformat() }}">
-                        <input type="hidden" name="symptom_index" value="{{ loop.index0 }}">
-                        <button type="submit" class="text-red-500 hover:text-red-400 text-sm px-2 py-1" title="Delete symptom">
-                            ✕
-                        </button>
-                    </form>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <p class="text-slate-400 text-sm mb-4">No symptoms logged yet today ✓</p>
-        {% endif %}
-        
-        <details class="border border-slate-600 rounded-lg">
-            <summary class="px-4 py-3 cursor-pointer bg-slate-900 hover:bg-slate-700 rounded-lg font-medium">
-                + Add Symptom
-            </summary>
-            <form action="/entries/symptom" method="post" class="p-4 space-y-4">
-                <input type="hidden" name="entry_date" value="{{ entry.entry_date.isoformat() }}">
-                
-                <div class="grid md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-300 mb-1">Type</label>
-                        <select name="symptom_type" required class="w-full border border-slate-600 rounded px-3 py-2">
-                            {% for stype in symptom_types %}
-                            <option value="{{ stype.value }}">{{ stype.value.replace('_', ' ').title() }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-slate-300 mb-1">Severity (0-10)</label>
-                        <input type="number" name="severity" min="0" max="10" value="5" required
-                               class="w-full border border-slate-600 rounded px-3 py-2">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-slate-300 mb-1">Location (optional)</label>
-                        <select name="location" class="w-full border border-slate-600 rounded px-3 py-2">
-                            <option value="">-- None --</option>
-                            {% for loc in body_locations %}
-                            <option value="{{ loc.value }}">{{ loc.value.replace('_', ' ').title() }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-slate-300 mb-1">Onset Time</label>
-                        <input type="time" name="onset_time" class="w-full border border-slate-600 rounded px-3 py-2">
-                    </div>
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-slate-300 mb-1">Notes</label>
-                    <input type="text" name="notes" class="w-full border border-slate-600 rounded px-3 py-2"
-                           placeholder="Any additional details">
-                </div>
-                
-                <button type="submit" class="bg-red-900/300 text-white px-4 py-2 rounded hover:bg-red-600">
-                    Add Symptom
-                </button>
-            </form>
-        </details>
-    </div>
-    
-    <!-- Incidents Section -->
-    <div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
-        <h2 class="text-xl font-semibold mb-4">⚠️ Incidents</h2>
-        
-        {% if entry.incidents %}
-        <div class="mb-4 space-y-2">
-            {% for incident in entry.incidents %}
-            <div class="p-3 rounded-lg bg-yellow-900/30 border border-yellow-700">
-                <div class="flex justify-between items-start">
+            {% if entry.symptoms %}
+            <div class="mb-3 space-y-2 max-h-40 overflow-y-auto">
+                {% for symptom in entry.symptoms %}
+                <div class="flex items-center justify-between p-2 rounded severity-{{ symptom.severity.value }} text-sm">
                     <div class="flex-grow">
-                        <div class="flex justify-between">
-                            <span class="font-medium">{{ incident.display_type }}</span>
-                            <span class="text-sm text-slate-400">{{ incident.location.value.replace('_', ' ').title() }}</span>
-                        </div>
-                        <p class="text-slate-300">{{ incident.description }}</p>
+                        <span class="font-medium">{{ symptom.display_type }}</span>
+                        {% if symptom.onset_time %}<span class="text-slate-400 ml-1">{{ symptom.onset_time.strftime('%H:%M') }}</span>{% endif %}
                     </div>
-                    <form action="/entries/incident/delete" method="post" class="inline ml-2"
-                          onsubmit="return confirm('Delete this incident?');">
-                        <input type="hidden" name="entry_date" value="{{ entry.entry_date.isoformat() }}">
-                        <input type="hidden" name="incident_index" value="{{ loop.index0 }}">
-                        <button type="submit" class="text-red-500 hover:text-red-400 text-sm px-2 py-1" title="Delete incident">
-                            ✕
-                        </button>
-                    </form>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold">{{ symptom.severity.value }}/10</span>
+                        <form action="/entries/symptom/delete" method="post" class="inline" onsubmit="return confirm('Delete?');">
+                            <input type="hidden" name="entry_date" value="{{ entry.entry_date.isoformat() }}">
+                            <input type="hidden" name="symptom_index" value="{{ loop.index0 }}">
+                            <button type="submit" class="text-red-500 hover:text-red-400">✕</button>
+                        </form>
+                    </div>
                 </div>
+                {% endfor %}
             </div>
-            {% endfor %}
+            {% else %}
+            <p class="text-slate-400 text-sm mb-3">No symptoms ✓</p>
+            {% endif %}
+            
+            <details class="border border-slate-600 rounded-lg">
+                <summary class="px-3 py-2 cursor-pointer bg-slate-900 hover:bg-slate-700 rounded-lg text-sm font-medium">+ Add Symptom</summary>
+                <form action="/entries/symptom" method="post" class="p-3 space-y-3">
+                    <input type="hidden" name="entry_date" value="{{ entry.entry_date.isoformat() }}">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Type</label>
+                            <select name="symptom_type" required class="w-full border border-slate-600 rounded px-2 py-1 text-sm">
+                                {% for stype in symptom_types %}
+                                <option value="{{ stype.value }}">{{ stype.value.replace('_', ' ').title() }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Severity</label>
+                            <input type="number" name="severity" min="0" max="10" value="5" required class="w-full border border-slate-600 rounded px-2 py-1 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Location</label>
+                            <select name="location" class="w-full border border-slate-600 rounded px-2 py-1 text-sm">
+                                <option value="">None</option>
+                                {% for loc in body_locations %}
+                                <option value="{{ loc.value }}">{{ loc.value.replace('_', ' ').title() }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Time</label>
+                            <input type="time" name="onset_time" class="w-full border border-slate-600 rounded px-2 py-1 text-sm">
+                        </div>
+                    </div>
+                    <input type="text" name="notes" class="w-full border border-slate-600 rounded px-2 py-1 text-sm" placeholder="Notes (optional)">
+                    <button type="submit" class="w-full bg-red-600 text-white px-3 py-1.5 rounded hover:bg-red-700 text-sm">Add Symptom</button>
+                </form>
+            </details>
         </div>
-        {% else %}
-        <p class="text-slate-400 text-sm mb-4">No incidents logged today ✓</p>
-        {% endif %}
         
-        <details class="border border-slate-600 rounded-lg">
-            <summary class="px-4 py-3 cursor-pointer bg-slate-900 hover:bg-slate-700 rounded-lg font-medium">
-                + Add Incident
-            </summary>
-            <form action="/entries/incident" method="post" class="p-4 space-y-4">
-                <input type="hidden" name="entry_date" value="{{ entry.entry_date.isoformat() }}">
-                
-                <div class="grid md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-300 mb-1">Type</label>
-                        <select name="incident_type" required class="w-full border border-slate-600 rounded px-3 py-2">
-                            {% for itype in incident_types %}
-                            <option value="{{ itype.value }}">{{ itype.value.title() }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-slate-300 mb-1">Body Location</label>
-                        <select name="location" required class="w-full border border-slate-600 rounded px-3 py-2">
-                            {% for loc in body_locations %}
-                            <option value="{{ loc.value }}">{{ loc.value.replace('_', ' ').title() }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-slate-300 mb-1">Severity</label>
-                        <input type="number" name="severity" min="0" max="10" value="3" required
-                               class="w-full border border-slate-600 rounded px-3 py-2">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-slate-300 mb-1">Time</label>
-                        <input type="time" name="time_occurred" class="w-full border border-slate-600 rounded px-3 py-2">
+        <!-- Incidents -->
+        <div class="bg-slate-800 rounded-xl shadow p-4">
+            <h2 class="text-lg font-semibold mb-3">⚠️ Incidents</h2>
+            
+            {% if entry.incidents %}
+            <div class="mb-3 space-y-2 max-h-40 overflow-y-auto">
+                {% for incident in entry.incidents %}
+                <div class="p-2 rounded bg-yellow-900/30 border border-yellow-700 text-sm">
+                    <div class="flex justify-between items-start">
+                        <div class="flex-grow">
+                            <span class="font-medium">{{ incident.display_type }}</span>
+                            <p class="text-slate-300 text-xs">{{ incident.description[:50] }}{% if incident.description|length > 50 %}...{% endif %}</p>
+                        </div>
+                        <form action="/entries/incident/delete" method="post" class="inline" onsubmit="return confirm('Delete?');">
+                            <input type="hidden" name="entry_date" value="{{ entry.entry_date.isoformat() }}">
+                            <input type="hidden" name="incident_index" value="{{ loop.index0 }}">
+                            <button type="submit" class="text-red-500 hover:text-red-400">✕</button>
+                        </form>
                     </div>
                 </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-slate-300 mb-1">What happened?</label>
-                    <textarea name="description" required rows="2"
-                              class="w-full border border-slate-600 rounded px-3 py-2"
-                              placeholder="Describe the incident"></textarea>
-                </div>
-                
-                <button type="submit" class="bg-yellow-900/300 text-white px-4 py-2 rounded hover:bg-yellow-600">
-                    Add Incident
-                </button>
-            </form>
-        </details>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-slate-400 text-sm mb-3">No incidents ✓</p>
+            {% endif %}
+            
+            <details class="border border-slate-600 rounded-lg">
+                <summary class="px-3 py-2 cursor-pointer bg-slate-900 hover:bg-slate-700 rounded-lg text-sm font-medium">+ Add Incident</summary>
+                <form action="/entries/incident" method="post" class="p-3 space-y-3">
+                    <input type="hidden" name="entry_date" value="{{ entry.entry_date.isoformat() }}">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Type</label>
+                            <select name="incident_type" required class="w-full border border-slate-600 rounded px-2 py-1 text-sm">
+                                {% for itype in incident_types %}
+                                <option value="{{ itype.value }}">{{ itype.value.title() }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Location</label>
+                            <select name="location" required class="w-full border border-slate-600 rounded px-2 py-1 text-sm">
+                                {% for loc in body_locations %}
+                                <option value="{{ loc.value }}">{{ loc.value.replace('_', ' ').title() }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Severity</label>
+                            <input type="number" name="severity" min="0" max="10" value="3" required class="w-full border border-slate-600 rounded px-2 py-1 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Time</label>
+                            <input type="time" name="time_occurred" class="w-full border border-slate-600 rounded px-2 py-1 text-sm">
+                        </div>
+                    </div>
+                    <textarea name="description" required rows="2" class="w-full border border-slate-600 rounded px-2 py-1 text-sm" placeholder="What happened?"></textarea>
+                    <button type="submit" class="w-full bg-yellow-600 text-white px-3 py-1.5 rounded hover:bg-yellow-700 text-sm">Add Incident</button>
+                </form>
+            </details>
+        </div>
     </div>
     
     <!-- Meals Section -->
@@ -975,164 +903,123 @@
         </details>
     </div>
     
-    <!-- Medications Section -->
-    <div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
-        <h2 class="text-xl font-semibold mb-4">💊 Medications</h2>
-        
-        {% if entry.medications %}
-        <div class="mb-4 space-y-2">
-            {% for med in entry.medications %}
-            <div class="p-3 rounded-lg bg-blue-900/30 border border-blue-700">
-                <div class="flex justify-between items-start">
-                    <div class="flex-grow">
-                        <p class="font-medium text-blue-900">{{ med.name }}</p>
-                        <p class="text-sm text-blue-400">
-                            {% if med.dosage %}{{ med.dosage }}{% endif %}
-                            {% if med.form %} ({{ med.form.value }}){% endif %}
-                            {% if med.time_taken %} at {{ med.time_taken.strftime('%H:%M') }}{% endif %}
-                        </p>
-                        {% if med.reason %}
-                        <p class="text-xs text-blue-600 mt-1">Reason: {{ med.reason }}</p>
-                        {% endif %}
+    <!-- Medications & Supplements Side-by-Side -->
+    <div class="grid md:grid-cols-2 gap-4 mb-6">
+        <!-- Medications -->
+        <div class="bg-slate-800 rounded-xl shadow p-4">
+            <h2 class="text-lg font-semibold mb-3">💊 Medications</h2>
+            
+            {% if entry.medications %}
+            <div class="mb-3 space-y-2 max-h-40 overflow-y-auto">
+                {% for med in entry.medications %}
+                <div class="p-2 rounded bg-blue-900/30 border border-blue-700 text-sm">
+                    <div class="flex justify-between items-start">
+                        <div class="flex-grow">
+                            <span class="font-medium text-blue-300">{{ med.name }}</span>
+                            <span class="text-blue-400 text-xs ml-1">
+                                {% if med.dosage %}{{ med.dosage }}{% endif %}
+                                {% if med.time_taken %} @ {{ med.time_taken.strftime('%H:%M') }}{% endif %}
+                            </span>
+                        </div>
+                        <form action="/entries/medication/delete" method="post" class="inline" onsubmit="return confirm('Delete?');">
+                            <input type="hidden" name="entry_date" value="{{ entry.entry_date.isoformat() }}">
+                            <input type="hidden" name="medication_index" value="{{ loop.index0 }}">
+                            <button type="submit" class="text-red-500 hover:text-red-400">✕</button>
+                        </form>
                     </div>
-                    <form action="/entries/medication/delete" method="post" class="inline"
-                          onsubmit="return confirm('Delete this medication?');">
-                        <input type="hidden" name="entry_date" value="{{ entry.entry_date.isoformat() }}">
-                        <input type="hidden" name="medication_index" value="{{ loop.index0 }}">
-                        <button type="submit" class="text-red-500 hover:text-red-400 text-sm px-2 py-1" title="Delete medication">
-                            ✕
-                        </button>
-                    </form>
                 </div>
+                {% endfor %}
             </div>
-            {% endfor %}
+            {% else %}
+            <p class="text-slate-400 text-sm mb-3">No medications logged</p>
+            {% endif %}
+            
+            <details class="border border-slate-600 rounded-lg">
+                <summary class="px-3 py-2 cursor-pointer bg-slate-900 hover:bg-slate-700 rounded-lg text-sm font-medium">+ Add Medication</summary>
+                <form action="/entries/medication" method="post" class="p-3 space-y-3">
+                    <input type="hidden" name="entry_date" value="{{ entry.entry_date.isoformat() }}">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Name</label>
+                            <input type="text" name="name" required class="w-full border border-slate-600 rounded px-2 py-1 text-sm" placeholder="Medication">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Dosage</label>
+                            <input type="text" name="dosage" class="w-full border border-slate-600 rounded px-2 py-1 text-sm" placeholder="100mg">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Form</label>
+                            <select name="form" class="w-full border border-slate-600 rounded px-2 py-1 text-sm">
+                                <option value="">Select</option>
+                                <option value="tablet">Tablet</option>
+                                <option value="capsule">Capsule</option>
+                                <option value="liquid">Liquid</option>
+                                <option value="injection">Injection</option>
+                                <option value="topical">Topical</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Time</label>
+                            <input type="time" name="time_taken" class="w-full border border-slate-600 rounded px-2 py-1 text-sm">
+                        </div>
+                    </div>
+                    <input type="text" name="reason" class="w-full border border-slate-600 rounded px-2 py-1 text-sm" placeholder="Reason (optional)">
+                    <button type="submit" class="w-full bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 text-sm">Add Medication</button>
+                </form>
+            </details>
         </div>
-        {% else %}
-        <p class="text-slate-400 text-sm mb-4">No medications logged yet today</p>
-        {% endif %}
         
-        <details class="border border-slate-600 rounded-lg">
-            <summary class="px-4 py-3 cursor-pointer bg-slate-900 hover:bg-slate-700 rounded-lg font-medium">
-                + Add Medication
-            </summary>
-            <form action="/entries/medication" method="post" class="p-4 space-y-4">
-                <input type="hidden" name="entry_date" value="{{ entry.entry_date.isoformat() }}">
-                
-                <div class="grid md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-300 mb-1">Medication Name</label>
-                        <input type="text" name="name" required
-                               class="w-full border border-slate-600 rounded px-3 py-2"
-                               placeholder="e.g., Sumatriptan, Ibuprofen">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-slate-300 mb-1">Dosage</label>
-                        <input type="text" name="dosage"
-                               class="w-full border border-slate-600 rounded px-3 py-2"
-                               placeholder="e.g., 100mg, 2 tablets">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-slate-300 mb-1">Form</label>
-                        <select name="form" class="w-full border border-slate-600 rounded px-3 py-2">
-                            <option value="">-- Select --</option>
-                            <option value="tablet">Tablet</option>
-                            <option value="capsule">Capsule</option>
-                            <option value="liquid">Liquid</option>
-                            <option value="injection">Injection</option>
-                            <option value="topical">Topical</option>
-                            <option value="inhaler">Inhaler</option>
-                            <option value="patch">Patch</option>
-                            <option value="drops">Drops</option>
-                            <option value="spray">Spray</option>
-                        </select>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-slate-300 mb-1">Time Taken</label>
-                        <input type="time" name="time_taken" class="w-full border border-slate-600 rounded px-3 py-2">
+        <!-- Supplements -->
+        <div class="bg-slate-800 rounded-xl shadow p-4">
+            <h2 class="text-lg font-semibold mb-3">🌿 Supplements</h2>
+            
+            {% if entry.supplements %}
+            <div class="mb-3 space-y-2 max-h-40 overflow-y-auto">
+                {% for supp in entry.supplements %}
+                <div class="p-2 rounded bg-green-900/30 border border-green-700 text-sm">
+                    <div class="flex justify-between items-start">
+                        <div class="flex-grow">
+                            <span class="font-medium text-green-300">{{ supp.name }}</span>
+                            <span class="text-green-400 text-xs ml-1">
+                                {% if supp.dosage %}{{ supp.dosage }}{% endif %}
+                                {% if supp.time_taken %} @ {{ supp.time_taken.strftime('%H:%M') }}{% endif %}
+                            </span>
+                        </div>
+                        <form action="/entries/supplement/delete" method="post" class="inline" onsubmit="return confirm('Delete?');">
+                            <input type="hidden" name="entry_date" value="{{ entry.entry_date.isoformat() }}">
+                            <input type="hidden" name="supplement_index" value="{{ loop.index0 }}">
+                            <button type="submit" class="text-red-500 hover:text-red-400">✕</button>
+                        </form>
                     </div>
                 </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-slate-300 mb-1">Reason (optional)</label>
-                    <input type="text" name="reason" class="w-full border border-slate-600 rounded px-3 py-2"
-                           placeholder="e.g., headache, prevention">
-                </div>
-                
-                <button type="submit" class="bg-blue-900/300 text-white px-4 py-2 rounded hover:bg-blue-600">
-                    Add Medication
-                </button>
-            </form>
-        </details>
-    </div>
-    
-    <!-- Supplements Section -->
-    <div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
-        <h2 class="text-xl font-semibold mb-4">🌿 Supplements</h2>
-        
-        {% if entry.supplements %}
-        <div class="mb-4 space-y-2">
-            {% for supp in entry.supplements %}
-            <div class="p-3 rounded-lg bg-green-900/30 border border-green-700">
-                <div class="flex justify-between items-start">
-                    <div class="flex-grow">
-                        <p class="font-medium text-green-900">{{ supp.name }}</p>
-                        <p class="text-sm text-green-400">
-                            {% if supp.dosage %}{{ supp.dosage }}{% endif %}
-                            {% if supp.time_taken %} at {{ supp.time_taken.strftime('%H:%M') }}{% endif %}
-                        </p>
-                    </div>
-                    <form action="/entries/supplement/delete" method="post" class="inline"
-                          onsubmit="return confirm('Delete this supplement?');">
-                        <input type="hidden" name="entry_date" value="{{ entry.entry_date.isoformat() }}">
-                        <input type="hidden" name="supplement_index" value="{{ loop.index0 }}">
-                        <button type="submit" class="text-red-500 hover:text-red-400 text-sm px-2 py-1" title="Delete supplement">
-                            ✕
-                        </button>
-                    </form>
-                </div>
+                {% endfor %}
             </div>
-            {% endfor %}
+            {% else %}
+            <p class="text-slate-400 text-sm mb-3">No supplements logged</p>
+            {% endif %}
+            
+            <details class="border border-slate-600 rounded-lg">
+                <summary class="px-3 py-2 cursor-pointer bg-slate-900 hover:bg-slate-700 rounded-lg text-sm font-medium">+ Add Supplement</summary>
+                <form action="/entries/supplement" method="post" class="p-3 space-y-3">
+                    <input type="hidden" name="entry_date" value="{{ entry.entry_date.isoformat() }}">
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Name</label>
+                            <input type="text" name="name" required class="w-full border border-slate-600 rounded px-2 py-1 text-sm" placeholder="Vitamin D">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Dosage</label>
+                            <input type="text" name="dosage" class="w-full border border-slate-600 rounded px-2 py-1 text-sm" placeholder="1000 IU">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Time</label>
+                            <input type="time" name="time_taken" class="w-full border border-slate-600 rounded px-2 py-1 text-sm">
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-700 text-sm">Add Supplement</button>
+                </form>
+            </details>
         </div>
-        {% else %}
-        <p class="text-slate-400 text-sm mb-4">No supplements logged yet today</p>
-        {% endif %}
-        
-        <details class="border border-slate-600 rounded-lg">
-            <summary class="px-4 py-3 cursor-pointer bg-slate-900 hover:bg-slate-700 rounded-lg font-medium">
-                + Add Supplement
-            </summary>
-            <form action="/entries/supplement" method="post" class="p-4 space-y-4">
-                <input type="hidden" name="entry_date" value="{{ entry.entry_date.isoformat() }}">
-                
-                <div class="grid md:grid-cols-3 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-300 mb-1">Supplement Name</label>
-                        <input type="text" name="name" required
-                               class="w-full border border-slate-600 rounded px-3 py-2"
-                               placeholder="e.g., Vitamin D, Magnesium">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-slate-300 mb-1">Dosage</label>
-                        <input type="text" name="dosage"
-                               class="w-full border border-slate-600 rounded px-3 py-2"
-                               placeholder="e.g., 1000 IU, 400mg">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-slate-300 mb-1">Time Taken</label>
-                        <input type="time" name="time_taken" class="w-full border border-slate-600 rounded px-3 py-2">
-                    </div>
-                </div>
-                
-                <button type="submit" class="bg-green-900/300 text-white px-4 py-2 rounded hover:bg-green-600">
-                    Add Supplement
-                </button>
-            </form>
-        </details>
     </div>
     
     <!-- Complete Entry -->
