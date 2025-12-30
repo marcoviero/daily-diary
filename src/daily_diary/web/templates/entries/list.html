@@ -4,10 +4,10 @@
 
 {% block content %}
 <div class="flex justify-between items-center mb-6">
-    <h1 class="text-3xl font-bold text-gray-800">Diary Entries</h1>
+    <h1 class="text-3xl font-bold text-slate-200">Diary Entries</h1>
     <div class="flex items-center space-x-4">
         <select onchange="window.location.href='/entries/?days=' + this.value" 
-                class="border rounded px-3 py-2">
+                class="border border-slate-600 rounded px-3 py-2">
             <option value="7" {% if days == 7 %}selected{% endif %}>Last 7 days</option>
             <option value="30" {% if days == 30 %}selected{% endif %}>Last 30 days</option>
             <option value="90" {% if days == 90 %}selected{% endif %}>Last 90 days</option>
@@ -20,41 +20,41 @@
 </div>
 
 {% if entries %}
-<div class="bg-white rounded-xl shadow overflow-hidden">
+<div class="bg-slate-800 rounded-xl shadow overflow-hidden">
     <table class="w-full">
-        <thead class="bg-gray-50">
+        <thead class="bg-slate-900">
             <tr>
-                <th class="px-6 py-3 text-left text-sm font-medium text-gray-500">Date</th>
-                <th class="px-6 py-3 text-left text-sm font-medium text-gray-500">Wellbeing</th>
-                <th class="px-6 py-3 text-left text-sm font-medium text-gray-500">Symptoms</th>
-                <th class="px-6 py-3 text-left text-sm font-medium text-gray-500">Activity</th>
-                <th class="px-6 py-3 text-left text-sm font-medium text-gray-500">Sleep</th>
-                <th class="px-6 py-3 text-left text-sm font-medium text-gray-500">Weather</th>
-                <th class="px-6 py-3 text-center text-sm font-medium text-gray-500">Status</th>
+                <th class="px-6 py-3 text-left text-sm font-medium text-slate-400">Date</th>
+                <th class="px-6 py-3 text-left text-sm font-medium text-slate-400">Wellbeing</th>
+                <th class="px-6 py-3 text-left text-sm font-medium text-slate-400">Symptoms</th>
+                <th class="px-6 py-3 text-left text-sm font-medium text-slate-400">Activity</th>
+                <th class="px-6 py-3 text-left text-sm font-medium text-slate-400">Sleep</th>
+                <th class="px-6 py-3 text-left text-sm font-medium text-slate-400">Weather</th>
+                <th class="px-6 py-3 text-center text-sm font-medium text-slate-400">Status</th>
                 <th class="px-6 py-3"></th>
             </tr>
         </thead>
-        <tbody class="divide-y divide-gray-200">
+        <tbody class="divide-y divide-slate-700">
             {% for entry in entries %}
-            <tr class="hover:bg-gray-50">
+            <tr class="hover:bg-slate-900">
                 <td class="px-6 py-4">
-                    <div class="font-medium text-gray-900">
+                    <div class="font-medium text-slate-200">
                         {{ entry.entry_date.strftime('%b %d, %Y') }}
                     </div>
-                    <div class="text-sm text-gray-500">
+                    <div class="text-sm text-slate-400">
                         {{ entry.entry_date.strftime('%A') }}
                     </div>
                 </td>
                 <td class="px-6 py-4">
                     {% if entry.overall_wellbeing %}
                     <span class="text-lg font-bold 
-                        {% if entry.overall_wellbeing >= 7 %}text-green-600
-                        {% elif entry.overall_wellbeing >= 4 %}text-yellow-600
-                        {% else %}text-red-600{% endif %}">
+                        {% if entry.overall_wellbeing >= 7 %}text-green-400
+                        {% elif entry.overall_wellbeing >= 4 %}text-yellow-400
+                        {% else %}text-red-400{% endif %}">
                         {{ entry.overall_wellbeing }}/10
                     </span>
                     {% else %}
-                    <span class="text-gray-400">-</span>
+                    <span class="text-slate-500">-</span>
                     {% endif %}
                 </td>
                 <td class="px-6 py-4">
@@ -73,20 +73,20 @@
                     <div class="text-sm">
                         {{ entry.integrations.total_activity_minutes|round|int }} min
                         {% if entry.integrations.total_elevation_gain %}
-                        <span class="text-gray-500">
+                        <span class="text-slate-400">
                             ({{ entry.integrations.total_elevation_gain|round|int }}m ↑)
                         </span>
                         {% endif %}
                     </div>
                     {% else %}
-                    <span class="text-gray-400">-</span>
+                    <span class="text-slate-500">-</span>
                     {% endif %}
                 </td>
                 <td class="px-6 py-4">
                     {% if entry.integrations.sleep and entry.integrations.sleep.sleep_score %}
                     <span class="font-medium">{{ entry.integrations.sleep.sleep_score }}</span>
                     {% else %}
-                    <span class="text-gray-400">-</span>
+                    <span class="text-slate-500">-</span>
                     {% endif %}
                 </td>
                 <td class="px-6 py-4">
@@ -96,13 +96,13 @@
                         {{ entry.integrations.weather.temp_avg_c|round|int }}°C
                         {% endif %}
                         {% if entry.integrations.weather.pressure_hpa %}
-                        <span class="text-gray-500">
+                        <span class="text-slate-400">
                             {{ entry.integrations.weather.pressure_hpa|round|int }} hPa
                         </span>
                         {% endif %}
                     </div>
                     {% else %}
-                    <span class="text-gray-400">-</span>
+                    <span class="text-slate-500">-</span>
                     {% endif %}
                 </td>
                 <td class="px-6 py-4 text-center">
@@ -114,7 +114,7 @@
                 </td>
                 <td class="px-6 py-4 text-right">
                     <a href="/entries/new?entry_date={{ entry.entry_date.isoformat() }}" 
-                       class="text-indigo-600 hover:text-indigo-900">
+                       class="text-indigo-400 hover:text-indigo-900">
                         Edit →
                     </a>
                 </td>
@@ -124,10 +124,10 @@
     </table>
 </div>
 {% else %}
-<div class="text-center py-12 bg-white rounded-xl shadow">
+<div class="text-center py-12 bg-slate-800 rounded-xl shadow">
     <div class="text-5xl mb-4">📔</div>
-    <h2 class="text-xl font-medium text-gray-700 mb-2">No entries yet</h2>
-    <p class="text-gray-500 mb-6">Start tracking your health today</p>
+    <h2 class="text-xl font-medium text-slate-300 mb-2">No entries yet</h2>
+    <p class="text-slate-400 mb-6">Start tracking your health today</p>
     <a href="/entries/new" class="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700">
         Create First Entry
     </a>

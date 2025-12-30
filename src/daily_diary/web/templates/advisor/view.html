@@ -7,25 +7,25 @@
     <!-- Header -->
     <div class="flex justify-between items-center mb-6">
         <div>
-            <h1 class="text-3xl font-bold text-gray-800">🩺 Consultation Details</h1>
-            <p class="text-gray-600 mt-1">{{ consultation.consultation_date }} • {{ consultation.message_count }} messages</p>
+            <h1 class="text-3xl font-bold text-slate-200">🩺 Consultation Details</h1>
+            <p class="text-slate-400 mt-1">{{ consultation.consultation_date }} • {{ consultation.message_count }} messages</p>
         </div>
         <div class="flex space-x-3">
-            <a href="/advisor/history" class="text-gray-500 hover:text-gray-700">← Back to History</a>
+            <a href="/advisor/history" class="text-slate-400 hover:text-slate-300">← Back to History</a>
         </div>
     </div>
     
     {% if consultation %}
     
     <!-- Metadata -->
-    <div class="bg-white rounded-xl shadow p-4 mb-6">
+    <div class="bg-slate-800 rounded-xl shadow p-4 mb-6">
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
-                <span class="text-gray-500">Date:</span>
+                <span class="text-slate-400">Date:</span>
                 <span class="font-medium">{{ consultation.consultation_date }}</span>
             </div>
             <div>
-                <span class="text-gray-500">Duration:</span>
+                <span class="text-slate-400">Duration:</span>
                 <span class="font-medium">
                     {% if consultation.started_at and consultation.ended_at %}
                     {{ consultation.started_at[:16] }} - {{ consultation.ended_at[11:16] }}
@@ -35,11 +35,11 @@
                 </span>
             </div>
             <div>
-                <span class="text-gray-500">Data Reviewed:</span>
+                <span class="text-slate-400">Data Reviewed:</span>
                 <span class="font-medium">{{ consultation.days_reviewed }} days</span>
             </div>
             <div>
-                <span class="text-gray-500">Provider:</span>
+                <span class="text-slate-400">Provider:</span>
                 <span class="font-medium capitalize">{{ consultation.provider or 'AI' }}</span>
             </div>
         </div>
@@ -49,42 +49,42 @@
     <div class="space-y-4">
         
         {% if consultation.chief_complaint %}
-        <div class="bg-white rounded-xl shadow p-6">
-            <h2 class="text-lg font-semibold text-gray-800 mb-2">Chief Complaint</h2>
-            <p class="text-gray-700">{{ consultation.chief_complaint }}</p>
+        <div class="bg-slate-800 rounded-xl shadow p-6">
+            <h2 class="text-lg font-semibold text-slate-200 mb-2">Chief Complaint</h2>
+            <p class="text-slate-300">{{ consultation.chief_complaint }}</p>
         </div>
         {% endif %}
         
         {% if consultation.summary %}
-        <div class="bg-white rounded-xl shadow p-6">
-            <h2 class="text-lg font-semibold text-gray-800 mb-2">Summary</h2>
-            <p class="text-gray-700">{{ consultation.summary }}</p>
+        <div class="bg-slate-800 rounded-xl shadow p-6">
+            <h2 class="text-lg font-semibold text-slate-200 mb-2">Summary</h2>
+            <p class="text-slate-300">{{ consultation.summary }}</p>
         </div>
         {% endif %}
         
         {% if consultation.key_findings %}
-        <div class="bg-blue-50 rounded-xl shadow p-6">
-            <h2 class="text-lg font-semibold text-blue-800 mb-2">🔍 Key Findings</h2>
-            <p class="text-blue-700 whitespace-pre-line">{{ consultation.key_findings }}</p>
+        <div class="bg-blue-900/30 rounded-xl shadow p-6">
+            <h2 class="text-lg font-semibold text-blue-300 mb-2">🔍 Key Findings</h2>
+            <p class="text-blue-400 whitespace-pre-line">{{ consultation.key_findings }}</p>
         </div>
         {% endif %}
         
         {% if consultation.patterns_identified %}
-        <div class="bg-purple-50 rounded-xl shadow p-6">
+        <div class="bg-purple-900/30 rounded-xl shadow p-6">
             <h2 class="text-lg font-semibold text-purple-800 mb-2">📊 Patterns Identified</h2>
             <p class="text-purple-700 whitespace-pre-line">{{ consultation.patterns_identified }}</p>
         </div>
         {% endif %}
         
         {% if consultation.recommendations %}
-        <div class="bg-green-50 rounded-xl shadow p-6">
-            <h2 class="text-lg font-semibold text-green-800 mb-2">💡 Recommendations</h2>
-            <p class="text-green-700 whitespace-pre-line">{{ consultation.recommendations }}</p>
+        <div class="bg-green-900/30 rounded-xl shadow p-6">
+            <h2 class="text-lg font-semibold text-green-300 mb-2">💡 Recommendations</h2>
+            <p class="text-green-400 whitespace-pre-line">{{ consultation.recommendations }}</p>
         </div>
         {% endif %}
         
         {% if consultation.triggers_discussed %}
-        <div class="bg-orange-50 rounded-xl shadow p-6">
+        <div class="bg-orange-900/30 rounded-xl shadow p-6">
             <h2 class="text-lg font-semibold text-orange-800 mb-2">⚡ Triggers Discussed</h2>
             <p class="text-orange-700">{{ consultation.triggers_discussed }}</p>
         </div>
@@ -99,10 +99,10 @@
         
         <!-- Conversation Transcript -->
         {% if consultation.conversation_json %}
-        <details class="bg-white rounded-xl shadow">
-            <summary class="p-6 cursor-pointer hover:bg-gray-50 rounded-xl">
-                <span class="text-lg font-semibold text-gray-800">💬 Full Conversation</span>
-                <span class="text-sm text-gray-500 ml-2">(click to expand)</span>
+        <details class="bg-slate-800 rounded-xl shadow">
+            <summary class="p-6 cursor-pointer hover:bg-slate-900 rounded-xl">
+                <span class="text-lg font-semibold text-slate-200">💬 Full Conversation</span>
+                <span class="text-sm text-slate-400 ml-2">(click to expand)</span>
             </summary>
             <div class="px-6 pb-6 space-y-4" id="conversation-container">
                 <!-- Will be populated by JavaScript -->
@@ -114,17 +114,17 @@
     
     <!-- Actions -->
     <div class="mt-6 flex justify-between items-center">
-        <a href="/advisor/history" class="text-gray-500 hover:text-gray-700">← Back to History</a>
+        <a href="/advisor/history" class="text-slate-400 hover:text-slate-300">← Back to History</a>
         <a href="/advisor/" class="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700">
             🩺 New Consultation
         </a>
     </div>
     
     {% else %}
-    <div class="bg-white rounded-xl shadow p-12 text-center">
+    <div class="bg-slate-800 rounded-xl shadow p-12 text-center">
         <div class="text-5xl mb-4">❓</div>
-        <h2 class="text-xl font-semibold text-gray-700 mb-2">Consultation not found</h2>
-        <p class="text-gray-500 mb-6">This consultation record could not be found.</p>
+        <h2 class="text-xl font-semibold text-slate-300 mb-2">Consultation not found</h2>
+        <p class="text-slate-400 mb-6">This consultation record could not be found.</p>
         <a href="/advisor/history" class="text-teal-600 hover:text-teal-800">← Back to History</a>
     </div>
     {% endif %}
@@ -146,7 +146,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const bubble = document.createElement('div');
             bubble.className = isUser 
                 ? 'bg-teal-600 text-white px-4 py-3 rounded-lg max-w-2xl'
-                : 'bg-gray-100 text-gray-800 px-4 py-3 rounded-lg max-w-2xl';
+                : 'bg-slate-700 text-slate-200 px-4 py-3 rounded-lg max-w-2xl';
             
             // Format content
             let content = msg.content

@@ -7,23 +7,23 @@
     <!-- Header -->
     <div class="flex justify-between items-center mb-6">
         <div>
-            <h1 class="text-3xl font-bold text-gray-800">🩺 Doctor's Appointment</h1>
-            <p class="text-gray-600 mt-1">AI Health Advisor - Not a replacement for real medical care</p>
+            <h1 class="text-3xl font-bold text-slate-200">🩺 Doctor's Appointment</h1>
+            <p class="text-slate-400 mt-1">AI Health Advisor - Not a replacement for real medical care</p>
         </div>
         <div class="flex space-x-3">
             <a href="/advisor/history" class="text-teal-600 hover:text-teal-800">📋 Past Visits</a>
-            <a href="/" class="text-gray-500 hover:text-gray-700">← Home</a>
+            <a href="/" class="text-slate-400 hover:text-slate-300">← Home</a>
         </div>
     </div>
     
     {% if not is_configured %}
     <!-- Not configured warning -->
-    <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-6 mb-6">
-        <h2 class="text-lg font-semibold text-yellow-800 mb-2">⚠️ AI Not Configured</h2>
-        <p class="text-yellow-700">
+    <div class="bg-yellow-900/30 border border-yellow-700 rounded-xl p-6 mb-6">
+        <h2 class="text-lg font-semibold text-yellow-300 mb-2">⚠️ AI Not Configured</h2>
+        <p class="text-yellow-400">
             To use the Health Advisor, please add one of these to your <code>.env</code> file:
         </p>
-        <ul class="mt-2 text-yellow-700 list-disc list-inside">
+        <ul class="mt-2 text-yellow-400 list-disc list-inside">
             <li><code>ANTHROPIC_API_KEY</code> (preferred)</li>
             <li><code>OPENAI_API_KEY</code> (fallback)</li>
         </ul>
@@ -31,8 +31,8 @@
     {% else %}
     
     <!-- Disclaimer -->
-    <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
-        <p class="text-blue-800 text-sm">
+    <div class="bg-blue-900/30 border border-blue-700 rounded-xl p-4 mb-6">
+        <p class="text-blue-300 text-sm">
             <strong>⚕️ Important:</strong> This AI advisor analyzes your health diary data to provide insights 
             and suggestions. It is <strong>not a substitute for professional medical advice</strong>. 
             Always consult a healthcare provider for medical concerns.
@@ -40,11 +40,11 @@
     </div>
     
     <!-- Chat Container -->
-    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+    <div class="bg-slate-800 rounded-xl shadow-lg overflow-hidden">
         <!-- Chat Header -->
         <div class="bg-gradient-to-r from-teal-600 to-teal-700 px-6 py-4">
             <div class="flex items-center space-x-3">
-                <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center text-2xl">
+                <div class="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center text-2xl">
                     👨‍⚕️
                 </div>
                 <div>
@@ -55,20 +55,20 @@
         </div>
         
         <!-- Chat Messages -->
-        <div id="chat-messages" class="h-96 overflow-y-auto p-6 space-y-4 bg-gray-50">
+        <div id="chat-messages" class="h-96 overflow-y-auto p-6 space-y-4 bg-slate-900">
             <!-- Welcome message -->
-            <div class="text-center text-gray-500 py-8">
+            <div class="text-center text-slate-400 py-8">
                 <p class="text-lg mb-2">Welcome to your consultation</p>
                 <p class="text-sm">Click "Start Consultation" to begin. The advisor will review your recent health data.</p>
             </div>
         </div>
         
         <!-- Input Area -->
-        <div class="border-t bg-white p-4">
+        <div class="border-t bg-slate-800 p-4">
             <div id="start-area" class="text-center">
                 <div class="mb-4">
-                    <label class="text-sm text-gray-600">Review data from the last </label>
-                    <select id="days-select" class="border rounded px-2 py-1 mx-1">
+                    <label class="text-sm text-slate-400">Review data from the last </label>
+                    <select id="days-select" class="border border-slate-600 rounded px-2 py-1 mx-1">
                         <option value="7">7 days</option>
                         <option value="14">14 days</option>
                         <option value="30" selected>30 days</option>
@@ -87,7 +87,7 @@
                     <input type="text" 
                            id="message-input"
                            placeholder="Describe your concerns or ask a question..."
-                           class="flex-1 border rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                           class="flex-1 border border-slate-600 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-teal-500"
                            autocomplete="off">
                     <button type="submit" 
                             id="send-btn"
@@ -96,9 +96,9 @@
                     </button>
                 </form>
                 <div class="flex justify-between items-center mt-3">
-                    <p id="provider-indicator" class="text-xs text-gray-400"></p>
+                    <p id="provider-indicator" class="text-xs text-slate-500"></p>
                     <button onclick="endConsultation()" 
-                            class="text-sm text-gray-500 hover:text-red-600">
+                            class="text-sm text-slate-400 hover:text-red-400">
                         End Consultation & Save
                     </button>
                 </div>
@@ -108,10 +108,10 @@
     
     <!-- Summary Modal -->
     <div id="summary-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white rounded-xl p-6 max-w-2xl w-full mx-4 shadow-2xl max-h-[80vh] overflow-y-auto">
+        <div class="bg-slate-800 rounded-xl p-6 max-w-2xl w-full mx-4 shadow-2xl max-h-[80vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-bold text-gray-800">📋 Visit Summary</h3>
-                <button onclick="closeSummaryModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                <h3 class="text-xl font-bold text-slate-200">📋 Visit Summary</h3>
+                <button onclick="closeSummaryModal()" class="text-slate-400 hover:text-slate-300 text-2xl">&times;</button>
             </div>
             <div id="summary-content" class="space-y-4">
                 <!-- Summary will be inserted here -->
@@ -126,31 +126,31 @@
     </div>
     
     <!-- Quick Topics -->
-    <div class="mt-6 bg-white rounded-xl shadow p-6">
-        <h3 class="font-semibold text-gray-700 mb-3">💡 Topics you might discuss:</h3>
+    <div class="mt-6 bg-slate-800 rounded-xl shadow p-6">
+        <h3 class="font-semibold text-slate-300 mb-3">💡 Topics you might discuss:</h3>
         <div class="flex flex-wrap gap-2">
             <button onclick="suggestTopic('I\\'ve been having headaches lately. Can you see any patterns in my data?')" 
-                    class="bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-full text-sm text-gray-700">
+                    class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-full text-sm text-slate-300">
                 Headache patterns
             </button>
             <button onclick="suggestTopic('How has my sleep been affecting my symptoms?')" 
-                    class="bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-full text-sm text-gray-700">
+                    class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-full text-sm text-slate-300">
                 Sleep impact
             </button>
             <button onclick="suggestTopic('Are there any triggers you can identify from my data?')" 
-                    class="bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-full text-sm text-gray-700">
+                    class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-full text-sm text-slate-300">
                 Identify triggers
             </button>
             <button onclick="suggestTopic('How does weather or pressure affect my symptoms?')" 
-                    class="bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-full text-sm text-gray-700">
+                    class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-full text-sm text-slate-300">
                 Weather effects
             </button>
             <button onclick="suggestTopic('What lifestyle changes might help based on my data?')" 
-                    class="bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-full text-sm text-gray-700">
+                    class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-full text-sm text-slate-300">
                 Lifestyle advice
             </button>
             <button onclick="suggestTopic('Can you summarize my overall health trends?')" 
-                    class="bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-full text-sm text-gray-700">
+                    class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-full text-sm text-slate-300">
                 Health summary
             </button>
         </div>
@@ -158,21 +158,21 @@
     
     <!-- Past Consultations Preview -->
     {% if past_consultations %}
-    <div class="mt-6 bg-white rounded-xl shadow p-6">
+    <div class="mt-6 bg-slate-800 rounded-xl shadow p-6">
         <div class="flex justify-between items-center mb-4">
-            <h3 class="font-semibold text-gray-700">📋 Recent Visits</h3>
+            <h3 class="font-semibold text-slate-300">📋 Recent Visits</h3>
             <a href="/advisor/history" class="text-sm text-teal-600 hover:text-teal-800">View All →</a>
         </div>
         <div class="space-y-2">
             {% for c in past_consultations[:3] %}
             <a href="/advisor/consultation/{{ c.id }}" 
-               class="block p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+               class="block p-3 bg-slate-900 rounded-lg hover:bg-slate-700 transition">
                 <div class="flex justify-between items-start">
                     <div>
-                        <p class="font-medium text-gray-800">{{ c.consultation_date }}</p>
-                        <p class="text-sm text-gray-600 truncate">{{ c.chief_complaint or c.summary[:100] or 'No summary' }}...</p>
+                        <p class="font-medium text-slate-200">{{ c.consultation_date }}</p>
+                        <p class="text-sm text-slate-400 truncate">{{ c.chief_complaint or c.summary[:100] or 'No summary' }}...</p>
                     </div>
-                    <span class="text-xs text-gray-400">{{ c.message_count }} messages</span>
+                    <span class="text-xs text-slate-500">{{ c.message_count }} messages</span>
                 </div>
             </a>
             {% endfor %}
@@ -196,11 +196,11 @@ function addMessage(content, isUser = false, isSystem = false) {
     const bubble = document.createElement('div');
     
     if (isSystem) {
-        bubble.className = 'bg-gray-200 text-gray-600 px-4 py-2 rounded-lg text-sm max-w-md';
+        bubble.className = 'bg-slate-600 text-slate-400 px-4 py-2 rounded-lg text-sm max-w-md';
     } else if (isUser) {
         bubble.className = 'bg-teal-600 text-white px-4 py-3 rounded-lg max-w-md';
     } else {
-        bubble.className = 'bg-white border px-4 py-3 rounded-lg max-w-2xl shadow-sm';
+        bubble.className = 'bg-slate-800 border px-4 py-3 rounded-lg max-w-2xl shadow-sm';
     }
     
     // Convert markdown-like formatting
@@ -345,7 +345,7 @@ async function endConsultation() {
     // Reset UI
     consultationStarted = false;
     document.getElementById('chat-messages').innerHTML = `
-        <div class="text-center text-gray-500 py-8">
+        <div class="text-center text-slate-400 py-8">
             <p class="text-lg mb-2">Consultation ended</p>
             <p class="text-sm">Your visit summary has been saved.</p>
         </div>
@@ -361,42 +361,42 @@ function showSummaryModal(summary) {
     let html = '';
     
     if (summary.chief_complaint) {
-        html += `<div class="bg-gray-50 p-4 rounded-lg">
-            <h4 class="font-medium text-gray-700 mb-1">Chief Complaint</h4>
-            <p class="text-gray-600">${summary.chief_complaint}</p>
+        html += `<div class="bg-slate-900 p-4 rounded-lg">
+            <h4 class="font-medium text-slate-300 mb-1">Chief Complaint</h4>
+            <p class="text-slate-400">${summary.chief_complaint}</p>
         </div>`;
     }
     
     if (summary.summary) {
-        html += `<div class="bg-gray-50 p-4 rounded-lg">
-            <h4 class="font-medium text-gray-700 mb-1">Summary</h4>
-            <p class="text-gray-600">${summary.summary}</p>
+        html += `<div class="bg-slate-900 p-4 rounded-lg">
+            <h4 class="font-medium text-slate-300 mb-1">Summary</h4>
+            <p class="text-slate-400">${summary.summary}</p>
         </div>`;
     }
     
     if (summary.key_findings) {
-        html += `<div class="bg-blue-50 p-4 rounded-lg">
-            <h4 class="font-medium text-blue-800 mb-1">🔍 Key Findings</h4>
-            <p class="text-blue-700 whitespace-pre-line">${summary.key_findings}</p>
+        html += `<div class="bg-blue-900/30 p-4 rounded-lg">
+            <h4 class="font-medium text-blue-300 mb-1">🔍 Key Findings</h4>
+            <p class="text-blue-400 whitespace-pre-line">${summary.key_findings}</p>
         </div>`;
     }
     
     if (summary.patterns_identified) {
-        html += `<div class="bg-purple-50 p-4 rounded-lg">
+        html += `<div class="bg-purple-900/30 p-4 rounded-lg">
             <h4 class="font-medium text-purple-800 mb-1">📊 Patterns Identified</h4>
             <p class="text-purple-700 whitespace-pre-line">${summary.patterns_identified}</p>
         </div>`;
     }
     
     if (summary.recommendations) {
-        html += `<div class="bg-green-50 p-4 rounded-lg">
-            <h4 class="font-medium text-green-800 mb-1">💡 Recommendations</h4>
-            <p class="text-green-700 whitespace-pre-line">${summary.recommendations}</p>
+        html += `<div class="bg-green-900/30 p-4 rounded-lg">
+            <h4 class="font-medium text-green-300 mb-1">💡 Recommendations</h4>
+            <p class="text-green-400 whitespace-pre-line">${summary.recommendations}</p>
         </div>`;
     }
     
     if (summary.triggers_discussed) {
-        html += `<div class="bg-orange-50 p-4 rounded-lg">
+        html += `<div class="bg-orange-900/30 p-4 rounded-lg">
             <h4 class="font-medium text-orange-800 mb-1">⚡ Triggers Discussed</h4>
             <p class="text-orange-700">${summary.triggers_discussed}</p>
         </div>`;
@@ -409,7 +409,7 @@ function showSummaryModal(summary) {
         </div>`;
     }
     
-    content.innerHTML = html || '<p class="text-gray-500">No summary available.</p>';
+    content.innerHTML = html || '<p class="text-slate-400">No summary available.</p>';
     
     document.getElementById('summary-modal').classList.remove('hidden');
     document.getElementById('summary-modal').classList.add('flex');

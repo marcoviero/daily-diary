@@ -7,14 +7,14 @@
     <!-- Header -->
     <div class="flex justify-between items-center mb-6">
         <div>
-            <h1 class="text-3xl font-bold text-gray-800">📋 Consultation History</h1>
-            <p class="text-gray-600 mt-1">Past visits with the AI Health Advisor</p>
+            <h1 class="text-3xl font-bold text-slate-200">📋 Consultation History</h1>
+            <p class="text-slate-400 mt-1">Past visits with the AI Health Advisor</p>
         </div>
         <div class="flex space-x-3">
             <a href="/advisor/" class="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700">
                 🩺 New Consultation
             </a>
-            <a href="/" class="text-gray-500 hover:text-gray-700">← Home</a>
+            <a href="/" class="text-slate-400 hover:text-slate-300">← Home</a>
         </div>
     </div>
     
@@ -22,14 +22,14 @@
     <div class="space-y-4">
         {% for c in consultations %}
         <a href="/advisor/consultation/{{ c.id }}" 
-           class="block bg-white rounded-xl shadow hover:shadow-lg transition p-6">
+           class="block bg-slate-800 rounded-xl shadow hover:shadow-lg transition p-6">
             <div class="flex justify-between items-start">
                 <div class="flex-1">
                     <div class="flex items-center space-x-3 mb-2">
-                        <span class="text-lg font-semibold text-gray-800">
+                        <span class="text-lg font-semibold text-slate-200">
                             {{ c.consultation_date }}
                         </span>
-                        <span class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                        <span class="text-xs bg-slate-700 text-slate-400 px-2 py-1 rounded">
                             {{ c.message_count }} messages
                         </span>
                         <span class="text-xs bg-teal-100 text-teal-700 px-2 py-1 rounded">
@@ -38,33 +38,33 @@
                     </div>
                     
                     {% if c.chief_complaint %}
-                    <p class="text-gray-700 font-medium mb-1">{{ c.chief_complaint }}</p>
+                    <p class="text-slate-300 font-medium mb-1">{{ c.chief_complaint }}</p>
                     {% endif %}
                     
                     {% if c.summary %}
-                    <p class="text-gray-600 text-sm">{{ c.summary[:200] }}{% if c.summary|length > 200 %}...{% endif %}</p>
+                    <p class="text-slate-400 text-sm">{{ c.summary[:200] }}{% if c.summary|length > 200 %}...{% endif %}</p>
                     {% endif %}
                     
                     <div class="flex flex-wrap gap-2 mt-3">
                         {% if c.patterns_identified %}
-                        <span class="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">
+                        <span class="text-xs bg-purple-900/50 text-purple-700 px-2 py-1 rounded">
                             📊 Patterns identified
                         </span>
                         {% endif %}
                         {% if c.recommendations %}
-                        <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                        <span class="text-xs bg-green-900/50 text-green-400 px-2 py-1 rounded">
                             💡 Recommendations
                         </span>
                         {% endif %}
                         {% if c.triggers_discussed %}
-                        <span class="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded">
+                        <span class="text-xs bg-orange-900/50 text-orange-700 px-2 py-1 rounded">
                             ⚡ Triggers
                         </span>
                         {% endif %}
                     </div>
                 </div>
                 
-                <div class="text-right text-sm text-gray-400">
+                <div class="text-right text-sm text-slate-500">
                     <p>{{ c.days_reviewed }} days reviewed</p>
                     {% if c.started_at %}
                     <p class="text-xs">{{ c.started_at[:16] }}</p>
@@ -75,10 +75,10 @@
         {% endfor %}
     </div>
     {% else %}
-    <div class="bg-white rounded-xl shadow p-12 text-center">
+    <div class="bg-slate-800 rounded-xl shadow p-12 text-center">
         <div class="text-5xl mb-4">🩺</div>
-        <h2 class="text-xl font-semibold text-gray-700 mb-2">No consultations yet</h2>
-        <p class="text-gray-500 mb-6">Start your first consultation to get personalized health insights.</p>
+        <h2 class="text-xl font-semibold text-slate-300 mb-2">No consultations yet</h2>
+        <p class="text-slate-400 mb-6">Start your first consultation to get personalized health insights.</p>
         <a href="/advisor/" class="bg-teal-600 text-white px-6 py-3 rounded-lg hover:bg-teal-700 inline-block">
             Start Consultation
         </a>

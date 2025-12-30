@@ -4,13 +4,13 @@
 
 {% block content %}
 <div class="mb-6">
-    <h1 class="text-3xl font-bold text-gray-800">⌨️ CLI Commands Reference</h1>
-    <p class="text-gray-500 mt-2">All commands use the <code class="bg-gray-100 px-2 py-1 rounded">diary</code> prefix (or <code class="bg-gray-100 px-2 py-1 rounded">uv run diary</code>)</p>
+    <h1 class="text-3xl font-bold text-slate-200">⌨️ CLI Commands Reference</h1>
+    <p class="text-slate-400 mt-2">All commands use the <code class="bg-slate-700 px-2 py-1 rounded">diary</code> prefix (or <code class="bg-slate-700 px-2 py-1 rounded">uv run diary</code>)</p>
 </div>
 
 <!-- Quick Start -->
-<div class="bg-indigo-50 border border-indigo-200 rounded-xl p-6 mb-6">
-    <h2 class="text-xl font-semibold text-indigo-800 mb-3">🚀 Quick Start</h2>
+<div class="bg-indigo-900/30 border border-indigo-700 rounded-xl p-6 mb-6">
+    <h2 class="text-xl font-semibold text-indigo-300 mb-3">🚀 Quick Start</h2>
     <div class="space-y-2 font-mono text-sm">
         <p><code>diary web</code> — Start web interface (this UI)</p>
         <p><code>diary status</code> — Check configuration and integrations</p>
@@ -19,78 +19,78 @@
 </div>
 
 <!-- Entry Management -->
-<div class="bg-white rounded-xl shadow p-6 mb-6">
+<div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
     <h2 class="text-xl font-semibold mb-4">📝 Entry Management</h2>
     <div class="overflow-x-auto">
         <table class="w-full text-sm">
-            <thead class="bg-gray-50">
+            <thead class="bg-slate-900">
                 <tr>
-                    <th class="px-4 py-2 text-left font-medium text-gray-600">Command</th>
-                    <th class="px-4 py-2 text-left font-medium text-gray-600">Description</th>
-                    <th class="px-4 py-2 text-left font-medium text-gray-600">Example</th>
+                    <th class="px-4 py-2 text-left font-medium text-slate-400">Command</th>
+                    <th class="px-4 py-2 text-left font-medium text-slate-400">Description</th>
+                    <th class="px-4 py-2 text-left font-medium text-slate-400">Example</th>
                 </tr>
             </thead>
             <tbody class="divide-y">
                 <tr>
                     <td class="px-4 py-3 font-mono">diary new [DATE]</td>
                     <td class="px-4 py-3">Start or continue an entry</td>
-                    <td class="px-4 py-3 text-gray-500 font-mono">diary new yesterday</td>
+                    <td class="px-4 py-3 text-slate-400 font-mono">diary new yesterday</td>
                 </tr>
                 <tr>
                     <td class="px-4 py-3 font-mono">diary show [DATE]</td>
                     <td class="px-4 py-3">Display an entry</td>
-                    <td class="px-4 py-3 text-gray-500 font-mono">diary show -1</td>
+                    <td class="px-4 py-3 text-slate-400 font-mono">diary show -1</td>
                 </tr>
                 <tr>
                     <td class="px-4 py-3 font-mono">diary list [--days N]</td>
                     <td class="px-4 py-3">List recent entries</td>
-                    <td class="px-4 py-3 text-gray-500 font-mono">diary list --days 14</td>
+                    <td class="px-4 py-3 text-slate-400 font-mono">diary list --days 14</td>
                 </tr>
                 <tr>
                     <td class="px-4 py-3 font-mono">diary search QUERY</td>
                     <td class="px-4 py-3">Search entries by text</td>
-                    <td class="px-4 py-3 text-gray-500 font-mono">diary search headache</td>
+                    <td class="px-4 py-3 text-slate-400 font-mono">diary search headache</td>
                 </tr>
                 <tr>
                     <td class="px-4 py-3 font-mono">diary symptom [DATE]</td>
                     <td class="px-4 py-3">Quick symptom logging</td>
-                    <td class="px-4 py-3 text-gray-500 font-mono">diary symptom</td>
+                    <td class="px-4 py-3 text-slate-400 font-mono">diary symptom</td>
                 </tr>
             </tbody>
         </table>
     </div>
     
-    <div class="mt-4 p-3 bg-gray-50 rounded text-sm">
+    <div class="mt-4 p-3 bg-slate-900 rounded text-sm">
         <strong>Date formats:</strong> 
-        <code class="bg-gray-200 px-1 rounded">2024-12-27</code>, 
-        <code class="bg-gray-200 px-1 rounded">yesterday</code>, 
-        <code class="bg-gray-200 px-1 rounded">-1</code> (1 day ago), 
-        <code class="bg-gray-200 px-1 rounded">-7</code> (week ago)
+        <code class="bg-slate-600 px-1 rounded">2024-12-27</code>, 
+        <code class="bg-slate-600 px-1 rounded">yesterday</code>, 
+        <code class="bg-slate-600 px-1 rounded">-1</code> (1 day ago), 
+        <code class="bg-slate-600 px-1 rounded">-7</code> (week ago)
     </div>
 </div>
 
 <!-- Meals & Nutrition -->
-<div class="bg-white rounded-xl shadow p-6 mb-6">
+<div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
     <h2 class="text-xl font-semibold mb-4">🍽️ Meals & Nutrition</h2>
     <div class="overflow-x-auto">
         <table class="w-full text-sm">
-            <thead class="bg-gray-50">
+            <thead class="bg-slate-900">
                 <tr>
-                    <th class="px-4 py-2 text-left font-medium text-gray-600">Command</th>
-                    <th class="px-4 py-2 text-left font-medium text-gray-600">Description</th>
-                    <th class="px-4 py-2 text-left font-medium text-gray-600">Example</th>
+                    <th class="px-4 py-2 text-left font-medium text-slate-400">Command</th>
+                    <th class="px-4 py-2 text-left font-medium text-slate-400">Description</th>
+                    <th class="px-4 py-2 text-left font-medium text-slate-400">Example</th>
                 </tr>
             </thead>
             <tbody class="divide-y">
                 <tr>
                     <td class="px-4 py-3 font-mono">diary log-meal DESCRIPTION</td>
                     <td class="px-4 py-3">Log meal with AI nutrition estimation</td>
-                    <td class="px-4 py-3 text-gray-500 font-mono">diary log-meal "grilled salmon with rice"</td>
+                    <td class="px-4 py-3 text-slate-400 font-mono">diary log-meal "grilled salmon with rice"</td>
                 </tr>
                 <tr>
                     <td class="px-4 py-3 font-mono">diary nutrition [--days N]</td>
                     <td class="px-4 py-3">Show nutrition summary</td>
-                    <td class="px-4 py-3 text-gray-500 font-mono">diary nutrition --days 7</td>
+                    <td class="px-4 py-3 text-slate-400 font-mono">diary nutrition --days 7</td>
                 </tr>
             </tbody>
         </table>
@@ -98,58 +98,58 @@
 </div>
 
 <!-- Voice Transcription -->
-<div class="bg-white rounded-xl shadow p-6 mb-6">
+<div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
     <h2 class="text-xl font-semibold mb-4">🎤 Voice Transcription</h2>
     <div class="overflow-x-auto">
         <table class="w-full text-sm">
-            <thead class="bg-gray-50">
+            <thead class="bg-slate-900">
                 <tr>
-                    <th class="px-4 py-2 text-left font-medium text-gray-600">Command</th>
-                    <th class="px-4 py-2 text-left font-medium text-gray-600">Description</th>
-                    <th class="px-4 py-2 text-left font-medium text-gray-600">Example</th>
+                    <th class="px-4 py-2 text-left font-medium text-slate-400">Command</th>
+                    <th class="px-4 py-2 text-left font-medium text-slate-400">Description</th>
+                    <th class="px-4 py-2 text-left font-medium text-slate-400">Example</th>
                 </tr>
             </thead>
             <tbody class="divide-y">
                 <tr>
                     <td class="px-4 py-3 font-mono">diary transcribe FILE [DATE]</td>
                     <td class="px-4 py-3">Transcribe audio and add to notes</td>
-                    <td class="px-4 py-3 text-gray-500 font-mono">diary transcribe recording.m4a</td>
+                    <td class="px-4 py-3 text-slate-400 font-mono">diary transcribe recording.m4a</td>
                 </tr>
             </tbody>
         </table>
     </div>
-    <div class="mt-4 p-3 bg-blue-50 rounded text-sm text-blue-800">
+    <div class="mt-4 p-3 bg-blue-900/30 rounded text-sm text-blue-300">
         Uses local faster-whisper (free). Supported formats: mp3, m4a, wav, webm, ogg
     </div>
 </div>
 
 <!-- Integrations -->
-<div class="bg-white rounded-xl shadow p-6 mb-6">
+<div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
     <h2 class="text-xl font-semibold mb-4">🔗 Integrations</h2>
     <div class="overflow-x-auto">
         <table class="w-full text-sm">
-            <thead class="bg-gray-50">
+            <thead class="bg-slate-900">
                 <tr>
-                    <th class="px-4 py-2 text-left font-medium text-gray-600">Command</th>
-                    <th class="px-4 py-2 text-left font-medium text-gray-600">Description</th>
-                    <th class="px-4 py-2 text-left font-medium text-gray-600">Example</th>
+                    <th class="px-4 py-2 text-left font-medium text-slate-400">Command</th>
+                    <th class="px-4 py-2 text-left font-medium text-slate-400">Description</th>
+                    <th class="px-4 py-2 text-left font-medium text-slate-400">Example</th>
                 </tr>
             </thead>
             <tbody class="divide-y">
                 <tr>
                     <td class="px-4 py-3 font-mono">diary status</td>
                     <td class="px-4 py-3">Show integration status</td>
-                    <td class="px-4 py-3 text-gray-500 font-mono">diary status</td>
+                    <td class="px-4 py-3 text-slate-400 font-mono">diary status</td>
                 </tr>
                 <tr>
                     <td class="px-4 py-3 font-mono">diary fetch [DATE]</td>
                     <td class="px-4 py-3">Fetch Oura, Strava, weather data</td>
-                    <td class="px-4 py-3 text-gray-500 font-mono">diary fetch yesterday</td>
+                    <td class="px-4 py-3 text-slate-400 font-mono">diary fetch yesterday</td>
                 </tr>
                 <tr>
                     <td class="px-4 py-3 font-mono">diary sleep-trends [--days N]</td>
                     <td class="px-4 py-3">Show sleep trends from Oura</td>
-                    <td class="px-4 py-3 text-gray-500 font-mono">diary sleep-trends --days 14</td>
+                    <td class="px-4 py-3 text-slate-400 font-mono">diary sleep-trends --days 14</td>
                 </tr>
             </tbody>
         </table>
@@ -157,22 +157,22 @@
 </div>
 
 <!-- Analysis -->
-<div class="bg-white rounded-xl shadow p-6 mb-6">
+<div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
     <h2 class="text-xl font-semibold mb-4">📊 Analysis</h2>
     <div class="overflow-x-auto">
         <table class="w-full text-sm">
-            <thead class="bg-gray-50">
+            <thead class="bg-slate-900">
                 <tr>
-                    <th class="px-4 py-2 text-left font-medium text-gray-600">Command</th>
-                    <th class="px-4 py-2 text-left font-medium text-gray-600">Description</th>
-                    <th class="px-4 py-2 text-left font-medium text-gray-600">Example</th>
+                    <th class="px-4 py-2 text-left font-medium text-slate-400">Command</th>
+                    <th class="px-4 py-2 text-left font-medium text-slate-400">Description</th>
+                    <th class="px-4 py-2 text-left font-medium text-slate-400">Example</th>
                 </tr>
             </thead>
             <tbody class="divide-y">
                 <tr>
                     <td class="px-4 py-3 font-mono">diary correlations [--days N]</td>
                     <td class="px-4 py-3">Show symptom correlations</td>
-                    <td class="px-4 py-3 text-gray-500 font-mono">diary correlations --days 90</td>
+                    <td class="px-4 py-3 text-slate-400 font-mono">diary correlations --days 90</td>
                 </tr>
             </tbody>
         </table>
@@ -180,52 +180,52 @@
 </div>
 
 <!-- Database -->
-<div class="bg-white rounded-xl shadow p-6 mb-6">
+<div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
     <h2 class="text-xl font-semibold mb-4">🗄️ Database Management</h2>
     <div class="overflow-x-auto">
         <table class="w-full text-sm">
-            <thead class="bg-gray-50">
+            <thead class="bg-slate-900">
                 <tr>
-                    <th class="px-4 py-2 text-left font-medium text-gray-600">Command</th>
-                    <th class="px-4 py-2 text-left font-medium text-gray-600">Description</th>
-                    <th class="px-4 py-2 text-left font-medium text-gray-600">Example</th>
+                    <th class="px-4 py-2 text-left font-medium text-slate-400">Command</th>
+                    <th class="px-4 py-2 text-left font-medium text-slate-400">Description</th>
+                    <th class="px-4 py-2 text-left font-medium text-slate-400">Example</th>
                 </tr>
             </thead>
             <tbody class="divide-y">
                 <tr>
                     <td class="px-4 py-3 font-mono">diary db-stats</td>
                     <td class="px-4 py-3">Show database size and table counts</td>
-                    <td class="px-4 py-3 text-gray-500 font-mono">diary db-stats</td>
+                    <td class="px-4 py-3 text-slate-400 font-mono">diary db-stats</td>
                 </tr>
                 <tr>
                     <td class="px-4 py-3 font-mono">diary db-compact</td>
                     <td class="px-4 py-3">Compact DB and reclaim space</td>
-                    <td class="px-4 py-3 text-gray-500 font-mono">diary db-compact</td>
+                    <td class="px-4 py-3 text-slate-400 font-mono">diary db-compact</td>
                 </tr>
                 <tr>
                     <td class="px-4 py-3 font-mono">diary db-migrate</td>
                     <td class="px-4 py-3">Run migrations and backfill data</td>
-                    <td class="px-4 py-3 text-gray-500 font-mono">diary db-migrate</td>
+                    <td class="px-4 py-3 text-slate-400 font-mono">diary db-migrate</td>
                 </tr>
                 <tr>
                     <td class="px-4 py-3 font-mono">diary sync-db</td>
                     <td class="px-4 py-3">Sync all entries to DuckDB</td>
-                    <td class="px-4 py-3 text-gray-500 font-mono">diary sync-db</td>
+                    <td class="px-4 py-3 text-slate-400 font-mono">diary sync-db</td>
                 </tr>
                 <tr>
                     <td class="px-4 py-3 font-mono">diary tables</td>
                     <td class="px-4 py-3">List tables with row counts</td>
-                    <td class="px-4 py-3 text-gray-500 font-mono">diary tables</td>
+                    <td class="px-4 py-3 text-slate-400 font-mono">diary tables</td>
                 </tr>
                 <tr>
                     <td class="px-4 py-3 font-mono">diary schema</td>
                     <td class="px-4 py-3">Show database schema</td>
-                    <td class="px-4 py-3 text-gray-500 font-mono">diary schema</td>
+                    <td class="px-4 py-3 text-slate-400 font-mono">diary schema</td>
                 </tr>
                 <tr>
                     <td class="px-4 py-3 font-mono">diary query SQL</td>
                     <td class="px-4 py-3">Run custom SQL query</td>
-                    <td class="px-4 py-3 text-gray-500 font-mono">diary query "SELECT * FROM meals LIMIT 5"</td>
+                    <td class="px-4 py-3 text-slate-400 font-mono">diary query "SELECT * FROM meals LIMIT 5"</td>
                 </tr>
             </tbody>
         </table>
@@ -233,22 +233,22 @@
 </div>
 
 <!-- Web Server -->
-<div class="bg-white rounded-xl shadow p-6 mb-6">
+<div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
     <h2 class="text-xl font-semibold mb-4">🌐 Web Server</h2>
     <div class="overflow-x-auto">
         <table class="w-full text-sm">
-            <thead class="bg-gray-50">
+            <thead class="bg-slate-900">
                 <tr>
-                    <th class="px-4 py-2 text-left font-medium text-gray-600">Command</th>
-                    <th class="px-4 py-2 text-left font-medium text-gray-600">Description</th>
-                    <th class="px-4 py-2 text-left font-medium text-gray-600">Example</th>
+                    <th class="px-4 py-2 text-left font-medium text-slate-400">Command</th>
+                    <th class="px-4 py-2 text-left font-medium text-slate-400">Description</th>
+                    <th class="px-4 py-2 text-left font-medium text-slate-400">Example</th>
                 </tr>
             </thead>
             <tbody class="divide-y">
                 <tr>
                     <td class="px-4 py-3 font-mono">diary web [--port N]</td>
                     <td class="px-4 py-3">Start web interface</td>
-                    <td class="px-4 py-3 text-gray-500 font-mono">diary web --port 8080</td>
+                    <td class="px-4 py-3 text-slate-400 font-mono">diary web --port 8080</td>
                 </tr>
             </tbody>
         </table>
@@ -256,27 +256,27 @@
 </div>
 
 <!-- Data Reset -->
-<div class="bg-red-50 border border-red-200 rounded-xl p-6 mb-6">
-    <h2 class="text-xl font-semibold text-red-800 mb-3">⚠️ Data Reset</h2>
-    <p class="text-sm text-red-700 mb-3">To clear all data and start fresh:</p>
-    <div class="bg-white p-3 rounded font-mono text-sm">
+<div class="bg-red-900/30 border border-red-700 rounded-xl p-6 mb-6">
+    <h2 class="text-xl font-semibold text-red-300 mb-3">⚠️ Data Reset</h2>
+    <p class="text-sm text-red-400 mb-3">To clear all data and start fresh:</p>
+    <div class="bg-slate-800 p-3 rounded font-mono text-sm">
         <p>cd daily-diary</p>
-        <p>rm -rf data/entries/      <span class="text-gray-400"># Delete JSON entries</span></p>
-        <p>rm -f data/analytics.duckdb  <span class="text-gray-400"># Delete DuckDB</span></p>
+        <p>rm -rf data/entries/      <span class="text-slate-500"># Delete JSON entries</span></p>
+        <p>rm -f data/analytics.duckdb  <span class="text-slate-500"># Delete DuckDB</span></p>
     </div>
-    <p class="text-sm text-red-600 mt-3">App recreates files automatically on next run.</p>
+    <p class="text-sm text-red-400 mt-3">App recreates files automatically on next run.</p>
 </div>
 
 <!-- Environment Variables -->
-<div class="bg-white rounded-xl shadow p-6 mb-6">
+<div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
     <h2 class="text-xl font-semibold mb-4">🔧 Configuration (.env)</h2>
     <div class="overflow-x-auto">
         <table class="w-full text-sm">
-            <thead class="bg-gray-50">
+            <thead class="bg-slate-900">
                 <tr>
-                    <th class="px-4 py-2 text-left font-medium text-gray-600">Variable</th>
-                    <th class="px-4 py-2 text-left font-medium text-gray-600">Purpose</th>
-                    <th class="px-4 py-2 text-left font-medium text-gray-600">Required?</th>
+                    <th class="px-4 py-2 text-left font-medium text-slate-400">Variable</th>
+                    <th class="px-4 py-2 text-left font-medium text-slate-400">Purpose</th>
+                    <th class="px-4 py-2 text-left font-medium text-slate-400">Required?</th>
                 </tr>
             </thead>
             <tbody class="divide-y">
@@ -288,27 +288,27 @@
                 <tr>
                     <td class="px-4 py-3 font-mono">DEFAULT_LATITUDE<br>DEFAULT_LONGITUDE</td>
                     <td class="px-4 py-3">Weather data location</td>
-                    <td class="px-4 py-3"><span class="text-green-600">Optional</span> (defaults to Portland)</td>
+                    <td class="px-4 py-3"><span class="text-green-400">Optional</span> (defaults to Portland)</td>
                 </tr>
                 <tr>
                     <td class="px-4 py-3 font-mono">OURA_ACCESS_TOKEN</td>
                     <td class="px-4 py-3">Oura Ring sleep data</td>
-                    <td class="px-4 py-3"><span class="text-green-600">Optional</span></td>
+                    <td class="px-4 py-3"><span class="text-green-400">Optional</span></td>
                 </tr>
                 <tr>
                     <td class="px-4 py-3 font-mono">STRAVA_CLIENT_ID<br>STRAVA_CLIENT_SECRET<br>STRAVA_REFRESH_TOKEN</td>
                     <td class="px-4 py-3">Strava activity data</td>
-                    <td class="px-4 py-3"><span class="text-green-600">Optional</span></td>
+                    <td class="px-4 py-3"><span class="text-green-400">Optional</span></td>
                 </tr>
                 <tr>
                     <td class="px-4 py-3 font-mono">OPENAI_API_KEY</td>
                     <td class="px-4 py-3">Fallback for AI features</td>
-                    <td class="px-4 py-3"><span class="text-green-600">Optional</span></td>
+                    <td class="px-4 py-3"><span class="text-green-400">Optional</span></td>
                 </tr>
                 <tr>
                     <td class="px-4 py-3 font-mono">TRANSCRIPTION_LOCAL_ONLY</td>
                     <td class="px-4 py-3">Use only local Whisper (no OpenAI)</td>
-                    <td class="px-4 py-3"><span class="text-gray-500">Default: true</span></td>
+                    <td class="px-4 py-3"><span class="text-slate-400">Default: true</span></td>
                 </tr>
             </tbody>
         </table>

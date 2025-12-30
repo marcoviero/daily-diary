@@ -5,13 +5,13 @@
 {% block content %}
 <div class="max-w-4xl mx-auto">
     <div class="flex justify-between items-center mb-6">
-        <h1 class="text-3xl font-bold text-gray-800">Correlation Analysis</h1>
-        <a href="/analysis/" class="text-indigo-600 hover:text-indigo-800">← Back to Dashboard</a>
+        <h1 class="text-3xl font-bold text-slate-200">Correlation Analysis</h1>
+        <a href="/analysis/" class="text-indigo-400 hover:text-indigo-300">← Back to Dashboard</a>
     </div>
     
-    <div class="bg-white rounded-xl shadow p-6 mb-6">
+    <div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
         <h2 class="text-xl font-semibold mb-2">About Correlations</h2>
-        <div class="text-gray-600 space-y-2">
+        <div class="text-slate-400 space-y-2">
             <p>
                 <strong>Correlation (r)</strong> measures how strongly two things are related. 
                 Values range from -1 to +1:
@@ -28,47 +28,47 @@
         </div>
     </div>
     
-    <div class="bg-white rounded-xl shadow p-6">
+    <div class="bg-slate-800 rounded-xl shadow p-6">
         <h2 class="text-xl font-semibold mb-4">All Correlations with {{ target.replace('_', ' ').title() }}</h2>
         
         {% if correlations %}
         <div class="space-y-4">
             {% for corr in correlations %}
-            <div class="border rounded-lg p-4 
-                {% if corr.is_significant and corr.correlation < 0 %}border-green-300 bg-green-50
-                {% elif corr.is_significant and corr.correlation > 0 %}border-red-300 bg-red-50
-                {% else %}border-gray-200{% endif %}">
+            <div class="border border-slate-600 rounded-lg p-4 
+                {% if corr.is_significant and corr.correlation < 0 %}border-green-300 bg-green-900/30
+                {% elif corr.is_significant and corr.correlation > 0 %}border-red-300 bg-red-900/30
+                {% else %}border-slate-600{% endif %}">
                 
                 <div class="flex justify-between items-start mb-2">
                     <div class="flex items-center">
                         <span class="font-medium text-lg">{{ corr.factor }}</span>
                         {% if corr.is_significant %}
-                        <span class="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Significant</span>
+                        <span class="ml-2 text-xs bg-yellow-900/50 text-yellow-300 px-2 py-1 rounded">Significant</span>
                         {% endif %}
                     </div>
                     <div class="text-right">
                         <div class="font-mono text-xl
-                            {% if corr.correlation < 0 %}text-green-600
-                            {% elif corr.correlation > 0 %}text-red-600
-                            {% else %}text-gray-500{% endif %}">
+                            {% if corr.correlation < 0 %}text-green-400
+                            {% elif corr.correlation > 0 %}text-red-400
+                            {% else %}text-slate-400{% endif %}">
                             r = {{ '%+.3f'|format(corr.correlation) }}
                         </div>
                     </div>
                 </div>
                 
-                <div class="flex items-center space-x-4 text-sm text-gray-500 mb-2">
+                <div class="flex items-center space-x-4 text-sm text-slate-400 mb-2">
                     <span>Strength: {{ corr.strength }}</span>
                     <span>Direction: {{ corr.direction }}</span>
                     <span>p = {{ '%.4f'|format(corr.p_value) }}</span>
                     <span>n = {{ corr.n_samples }}</span>
                 </div>
                 
-                <p class="text-gray-700">{{ corr.interpretation }}</p>
+                <p class="text-slate-300">{{ corr.interpretation }}</p>
             </div>
             {% endfor %}
         </div>
         {% else %}
-        <p class="text-gray-500 text-center py-8">Not enough data to compute correlations.</p>
+        <p class="text-slate-400 text-center py-8">Not enough data to compute correlations.</p>
         {% endif %}
     </div>
 </div>

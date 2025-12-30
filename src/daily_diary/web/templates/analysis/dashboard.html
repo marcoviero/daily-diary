@@ -4,9 +4,9 @@
 
 {% block content %}
 <div class="flex justify-between items-center mb-6">
-    <h1 class="text-3xl font-bold text-gray-800">📊 Health Analysis</h1>
+    <h1 class="text-3xl font-bold text-slate-200">📊 Health Analysis</h1>
     <select onchange="window.location.href='/analysis/?days=' + this.value" 
-            class="border rounded px-3 py-2">
+            class="border border-slate-600 rounded px-3 py-2">
         <option value="30" {% if days == 30 %}selected{% endif %}>Last 30 days</option>
         <option value="60" {% if days == 60 %}selected{% endif %}>Last 60 days</option>
         <option value="90" {% if days == 90 %}selected{% endif %}>Last 90 days</option>
@@ -16,10 +16,10 @@
 </div>
 
 {% if summary.get('error') %}
-<div class="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center">
+<div class="bg-yellow-900/30 border border-yellow-700 rounded-xl p-6 text-center">
     <div class="text-5xl mb-4">📭</div>
-    <h2 class="text-xl font-medium text-gray-700 mb-2">Not enough data yet</h2>
-    <p class="text-gray-500 mb-6">Start logging entries to see patterns and correlations</p>
+    <h2 class="text-xl font-medium text-slate-300 mb-2">Not enough data yet</h2>
+    <p class="text-slate-400 mb-6">Start logging entries to see patterns and correlations</p>
     <a href="/entries/new" class="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700">
         Create Entry
     </a>
@@ -28,27 +28,27 @@
 
 <!-- Summary Cards -->
 <div class="grid md:grid-cols-4 gap-4 mb-6">
-    <div class="bg-white rounded-xl shadow p-6">
-        <div class="text-3xl font-bold text-indigo-600">{{ summary.period_days }}</div>
-        <div class="text-sm text-gray-500">Days Tracked</div>
+    <div class="bg-slate-800 rounded-xl shadow p-6">
+        <div class="text-3xl font-bold text-indigo-400">{{ summary.period_days }}</div>
+        <div class="text-sm text-slate-400">Days Tracked</div>
     </div>
-    <div class="bg-white rounded-xl shadow p-6">
+    <div class="bg-slate-800 rounded-xl shadow p-6">
         <div class="text-3xl font-bold text-red-500">{{ (summary.symptom_rate * 100)|round|int }}%</div>
-        <div class="text-sm text-gray-500">Days with Symptoms</div>
+        <div class="text-sm text-slate-400">Days with Symptoms</div>
     </div>
-    <div class="bg-white rounded-xl shadow p-6">
-        <div class="text-3xl font-bold text-green-600">{{ summary.avg_wellbeing|round(1) if summary.avg_wellbeing else '-' }}</div>
-        <div class="text-sm text-gray-500">Avg Wellbeing</div>
+    <div class="bg-slate-800 rounded-xl shadow p-6">
+        <div class="text-3xl font-bold text-green-400">{{ summary.avg_wellbeing|round(1) if summary.avg_wellbeing else '-' }}</div>
+        <div class="text-sm text-slate-400">Avg Wellbeing</div>
     </div>
-    <div class="bg-white rounded-xl shadow p-6">
+    <div class="bg-slate-800 rounded-xl shadow p-6">
         <div class="text-3xl font-bold text-blue-600">{{ summary.avg_sleep_score|round|int if summary.avg_sleep_score else '-' }}</div>
-        <div class="text-sm text-gray-500">Avg Sleep Score</div>
+        <div class="text-sm text-slate-400">Avg Sleep Score</div>
     </div>
 </div>
 
 <!-- Symptom Timeline Chart -->
 {% if chart_data.get('symptom_timeline') %}
-<div class="bg-white rounded-xl shadow p-6 mb-6">
+<div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
     <h2 class="text-xl font-semibold mb-4">Symptom Timeline</h2>
     <div id="symptom-timeline" style="height: 300px;"></div>
 </div>
@@ -56,34 +56,34 @@
 
 <!-- Significant Correlations -->
 {% if significant_correlations %}
-<div class="bg-white rounded-xl shadow p-6 mb-6">
+<div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
     <h2 class="text-xl font-semibold mb-4">🔍 Significant Correlations</h2>
-    <p class="text-sm text-gray-500 mb-4">These factors show statistically significant relationships with your symptoms (p < 0.05)</p>
+    <p class="text-sm text-slate-400 mb-4">These factors show statistically significant relationships with your symptoms (p < 0.05)</p>
     
     <div class="space-y-4">
         {% for corr in significant_correlations %}
-        <div class="border rounded-lg p-4 
-            {% if corr.correlation < 0 %}border-green-200 bg-green-50
-            {% else %}border-red-200 bg-red-50{% endif %}">
+        <div class="border border-slate-600 rounded-lg p-4 
+            {% if corr.correlation < 0 %}border-green-700 bg-green-900/30
+            {% else %}border-red-700 bg-red-900/30{% endif %}">
             <div class="flex justify-between items-start">
                 <div>
                     <span class="font-medium text-lg">{{ corr.factor }}</span>
                     <span class="ml-2 text-sm px-2 py-1 rounded
-                        {% if corr.strength == 'strong' or corr.strength == 'very strong' %}bg-purple-100 text-purple-800
-                        {% elif corr.strength == 'moderate' %}bg-blue-100 text-blue-800
-                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                        {% if corr.strength == 'strong' or corr.strength == 'very strong' %}bg-purple-900/50 text-purple-800
+                        {% elif corr.strength == 'moderate' %}bg-blue-900/50 text-blue-300
+                        {% else %}bg-slate-700 text-slate-200{% endif %}">
                         {{ corr.strength }}
                     </span>
                 </div>
                 <div class="text-right">
                     <div class="font-mono text-lg 
-                        {% if corr.correlation < 0 %}text-green-600{% else %}text-red-600{% endif %}">
+                        {% if corr.correlation < 0 %}text-green-400{% else %}text-red-400{% endif %}">
                         r = {{ '%+.3f'|format(corr.correlation) }}
                     </div>
-                    <div class="text-xs text-gray-500">p = {{ '%.4f'|format(corr.p_value) }}</div>
+                    <div class="text-xs text-slate-400">p = {{ '%.4f'|format(corr.p_value) }}</div>
                 </div>
             </div>
-            <p class="mt-2 text-gray-700">{{ corr.interpretation }}</p>
+            <p class="mt-2 text-slate-300">{{ corr.interpretation }}</p>
         </div>
         {% endfor %}
     </div>
@@ -92,12 +92,12 @@
 
 <!-- Patterns Detected -->
 {% if patterns %}
-<div class="bg-white rounded-xl shadow p-6 mb-6">
+<div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
     <h2 class="text-xl font-semibold mb-4">📅 Patterns Detected</h2>
     <div class="space-y-3">
         {% for pattern in patterns %}
-        <div class="p-4 bg-gray-50 rounded-lg">
-            <p class="text-gray-700">{{ pattern.description }}</p>
+        <div class="p-4 bg-slate-900 rounded-lg">
+            <p class="text-slate-300">{{ pattern.description }}</p>
         </div>
         {% endfor %}
     </div>
@@ -106,25 +106,25 @@
 
 <!-- Medication Effectiveness -->
 {% if medication_analysis %}
-<div class="bg-white rounded-xl shadow p-6 mb-6">
+<div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
     <h2 class="text-xl font-semibold mb-4">💊 Medication Effectiveness</h2>
-    <p class="text-sm text-gray-500 mb-4">Analysis of rescue medications and their relationship to symptoms</p>
+    <p class="text-sm text-slate-400 mb-4">Analysis of rescue medications and their relationship to symptoms</p>
     
     <div class="space-y-4">
         {% for med in medication_analysis %}
-        <div class="border rounded-lg p-4 {% if med.data_quality == 'good' %}border-blue-200 bg-blue-50{% elif med.data_quality == 'limited' %}border-yellow-200 bg-yellow-50{% else %}border-gray-200 bg-gray-50{% endif %}">
+        <div class="border border-slate-600 rounded-lg p-4 {% if med.data_quality == 'good' %}border-blue-700 bg-blue-900/30{% elif med.data_quality == 'limited' %}border-yellow-700 bg-yellow-900/30{% else %}border-slate-600 bg-slate-900{% endif %}">
             <div class="flex justify-between items-start mb-2">
                 <div>
                     <span class="font-medium text-lg">{{ med.medication }}</span>
                     {% if med.dosage %}
-                    <span class="ml-2 text-sm text-gray-500">{{ med.dosage }}</span>
+                    <span class="ml-2 text-sm text-slate-400">{{ med.dosage }}</span>
                     {% endif %}
                 </div>
                 <div class="text-right">
                     <span class="text-sm px-2 py-1 rounded
-                        {% if med.data_quality == 'good' %}bg-green-100 text-green-800
-                        {% elif med.data_quality == 'limited' %}bg-yellow-100 text-yellow-800
-                        {% else %}bg-gray-100 text-gray-600{% endif %}">
+                        {% if med.data_quality == 'good' %}bg-green-900/50 text-green-300
+                        {% elif med.data_quality == 'limited' %}bg-yellow-900/50 text-yellow-300
+                        {% else %}bg-slate-700 text-slate-400{% endif %}">
                         {{ med.data_quality }} data
                     </span>
                 </div>
@@ -132,22 +132,22 @@
             
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3 text-sm">
                 <div>
-                    <span class="text-gray-500">Times taken:</span>
+                    <span class="text-slate-400">Times taken:</span>
                     <span class="font-medium ml-1">{{ med.times_taken }}</span>
                 </div>
                 <div>
-                    <span class="text-gray-500">Days used:</span>
+                    <span class="text-slate-400">Days used:</span>
                     <span class="font-medium ml-1">{{ med.days_taken }}</span>
                 </div>
                 {% if med.avg_severity_med_days %}
                 <div>
-                    <span class="text-gray-500">Severity (med days):</span>
+                    <span class="text-slate-400">Severity (med days):</span>
                     <span class="font-medium ml-1">{{ med.avg_severity_med_days }}/10</span>
                 </div>
                 {% endif %}
                 {% if med.avg_severity_baseline %}
                 <div>
-                    <span class="text-gray-500">Baseline severity:</span>
+                    <span class="text-slate-400">Baseline severity:</span>
                     <span class="font-medium ml-1">{{ med.avg_severity_baseline }}/10</span>
                 </div>
                 {% endif %}
@@ -156,17 +156,17 @@
             {% if med.effectiveness_notes %}
             <div class="space-y-1">
                 {% for note in med.effectiveness_notes %}
-                <p class="text-sm text-gray-700">📊 {{ note }}</p>
+                <p class="text-sm text-slate-300">📊 {{ note }}</p>
                 {% endfor %}
             </div>
             {% elif med.data_quality == 'insufficient' %}
-            <p class="text-sm text-gray-500 italic">Need more data points (at least 3) for analysis</p>
+            <p class="text-sm text-slate-400 italic">Need more data points (at least 3) for analysis</p>
             {% endif %}
         </div>
         {% endfor %}
     </div>
     
-    <div class="mt-4 p-3 bg-gray-100 rounded text-sm text-gray-600">
+    <div class="mt-4 p-3 bg-slate-700 rounded text-sm text-slate-400">
         <strong>💡 Tip:</strong> Log medications with timestamps and reasons for better analysis. 
         Example: "Took 25mg indomethacin at 2pm for headache severity 7"
     </div>
@@ -175,30 +175,30 @@
 
 <!-- All Correlations Table -->
 {% if correlations %}
-<div class="bg-white rounded-xl shadow p-6 mb-6">
+<div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
     <h2 class="text-xl font-semibold mb-4">All Correlations</h2>
-    <p class="text-sm text-gray-500 mb-4">Sorted by correlation strength. Green = protective, Red = risk factor.</p>
+    <p class="text-sm text-slate-400 mb-4">Sorted by correlation strength. Green = protective, Red = risk factor.</p>
     
     <div class="overflow-x-auto">
         <table class="w-full">
-            <thead class="bg-gray-50">
+            <thead class="bg-slate-900">
                 <tr>
-                    <th class="px-4 py-2 text-left text-sm font-medium text-gray-500">Factor</th>
-                    <th class="px-4 py-2 text-center text-sm font-medium text-gray-500">Correlation (r)</th>
-                    <th class="px-4 py-2 text-center text-sm font-medium text-gray-500">Strength</th>
-                    <th class="px-4 py-2 text-center text-sm font-medium text-gray-500">p-value</th>
-                    <th class="px-4 py-2 text-center text-sm font-medium text-gray-500">Significant?</th>
-                    <th class="px-4 py-2 text-center text-sm font-medium text-gray-500">N</th>
+                    <th class="px-4 py-2 text-left text-sm font-medium text-slate-400">Factor</th>
+                    <th class="px-4 py-2 text-center text-sm font-medium text-slate-400">Correlation (r)</th>
+                    <th class="px-4 py-2 text-center text-sm font-medium text-slate-400">Strength</th>
+                    <th class="px-4 py-2 text-center text-sm font-medium text-slate-400">p-value</th>
+                    <th class="px-4 py-2 text-center text-sm font-medium text-slate-400">Significant?</th>
+                    <th class="px-4 py-2 text-center text-sm font-medium text-slate-400">N</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200">
+            <tbody class="divide-y divide-slate-700">
                 {% for corr in correlations %}
-                <tr class="{% if corr.is_significant %}bg-yellow-50{% endif %}">
+                <tr class="{% if corr.is_significant %}bg-yellow-900/30{% endif %}">
                     <td class="px-4 py-3 font-medium">{{ corr.factor }}</td>
                     <td class="px-4 py-3 text-center font-mono
-                        {% if corr.correlation < -0.1 %}text-green-600
-                        {% elif corr.correlation > 0.1 %}text-red-600
-                        {% else %}text-gray-500{% endif %}">
+                        {% if corr.correlation < -0.1 %}text-green-400
+                        {% elif corr.correlation > 0.1 %}text-red-400
+                        {% else %}text-slate-400{% endif %}">
                         {{ '%+.3f'|format(corr.correlation) }}
                     </td>
                     <td class="px-4 py-3 text-center text-sm">{{ corr.strength }}</td>
@@ -207,10 +207,10 @@
                         {% if corr.is_significant %}
                         <span class="text-green-500">✓</span>
                         {% else %}
-                        <span class="text-gray-300">-</span>
+                        <span class="text-slate-500">-</span>
                         {% endif %}
                     </td>
-                    <td class="px-4 py-3 text-center text-sm text-gray-500">{{ corr.n_samples }}</td>
+                    <td class="px-4 py-3 text-center text-sm text-slate-400">{{ corr.n_samples }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -222,14 +222,14 @@
 <!-- Scatter Plots -->
 <div class="grid md:grid-cols-2 gap-6 mb-6">
     {% if chart_data.get('pressure_scatter') %}
-    <div class="bg-white rounded-xl shadow p-6">
+    <div class="bg-slate-800 rounded-xl shadow p-6">
         <h3 class="text-lg font-semibold mb-4">Pressure vs Symptoms</h3>
         <div id="pressure-scatter" style="height: 300px;"></div>
     </div>
     {% endif %}
     
     {% if chart_data.get('sleep_scatter') %}
-    <div class="bg-white rounded-xl shadow p-6">
+    <div class="bg-slate-800 rounded-xl shadow p-6">
         <h3 class="text-lg font-semibold mb-4">Sleep vs Symptoms</h3>
         <div id="sleep-scatter" style="height: 300px;"></div>
     </div>
@@ -242,6 +242,15 @@
 {% block scripts %}
 <script>
     const chartData = {{ chart_data | tojson }};
+    
+    // Dark mode layout for Plotly
+    const darkLayout = {
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        font: { color: '#94a3b8' },
+        xaxis: { gridcolor: '#334155', zerolinecolor: '#475569' },
+        yaxis: { gridcolor: '#334155', zerolinecolor: '#475569' }
+    };
     
     // Symptom Timeline
     if (chartData.symptom_timeline) {
@@ -271,11 +280,12 @@
         }
         
         Plotly.newPlot('symptom-timeline', timelineData, {
+            ...darkLayout,
             margin: { t: 20, r: 50 },
-            xaxis: { title: '' },
-            yaxis: { title: 'Symptom Severity', range: [0, 10] },
-            yaxis2: { title: 'Wellbeing', overlaying: 'y', side: 'right', range: [0, 10] },
-            legend: { x: 0, y: 1.1, orientation: 'h' }
+            xaxis: { ...darkLayout.xaxis, title: '' },
+            yaxis: { ...darkLayout.yaxis, title: 'Symptom Severity', range: [0, 10] },
+            yaxis2: { title: 'Wellbeing', overlaying: 'y', side: 'right', range: [0, 10], gridcolor: '#334155', font: { color: '#94a3b8' } },
+            legend: { x: 0, y: 1.1, orientation: 'h', font: { color: '#94a3b8' } }
         }, { responsive: true });
     }
     
@@ -286,13 +296,14 @@
             y: chartData.pressure_scatter.severity,
             mode: 'markers',
             type: 'scatter',
-            marker: { size: 10, color: '#6366f1' },
+            marker: { size: 10, color: '#818cf8' },
             text: chartData.pressure_scatter.dates,
             hovertemplate: '%{text}<br>Pressure: %{x} hPa<br>Severity: %{y}<extra></extra>'
         }], {
+            ...darkLayout,
             margin: { t: 20 },
-            xaxis: { title: 'Barometric Pressure (hPa)' },
-            yaxis: { title: 'Symptom Severity', range: [0, 10] }
+            xaxis: { ...darkLayout.xaxis, title: 'Barometric Pressure (hPa)' },
+            yaxis: { ...darkLayout.yaxis, title: 'Symptom Severity', range: [0, 10] }
         }, { responsive: true });
     }
     
@@ -303,11 +314,12 @@
             y: chartData.sleep_scatter.severity,
             mode: 'markers',
             type: 'scatter',
-            marker: { size: 10, color: '#22c55e' }
+            marker: { size: 10, color: '#34d399' }
         }], {
+            ...darkLayout,
             margin: { t: 20 },
-            xaxis: { title: 'Sleep Score' },
-            yaxis: { title: 'Symptom Severity', range: [0, 10] }
+            xaxis: { ...darkLayout.xaxis, title: 'Sleep Score' },
+            yaxis: { ...darkLayout.yaxis, title: 'Symptom Severity', range: [0, 10] }
         }, { responsive: true });
     }
 </script>

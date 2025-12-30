@@ -5,51 +5,51 @@
 {% block content %}
 <div class="max-w-4xl mx-auto">
     <div class="flex justify-between items-center mb-6">
-        <h1 class="text-3xl font-bold text-gray-800">
+        <h1 class="text-3xl font-bold text-slate-200">
             {{ entry.entry_date.strftime('%A, %B %d, %Y') }}
         </h1>
         <div class="flex space-x-2">
             <input type="date" 
                    id="date-picker" 
                    value="{{ entry.entry_date.isoformat() }}"
-                   class="border rounded px-3 py-2"
+                   class="border border-slate-600 rounded px-3 py-2"
                    onchange="window.location.href='/entries/new?entry_date=' + this.value">
         </div>
     </div>
     
     <!-- Auto-collected data -->
     {% if entry.integrations.weather or entry.integrations.activities or entry.integrations.sleep %}
-    <div class="bg-blue-50 rounded-xl p-6 mb-6">
-        <h2 class="text-lg font-semibold text-blue-800 mb-4">📡 Auto-collected Data</h2>
+    <div class="bg-blue-900/30 rounded-xl p-6 mb-6">
+        <h2 class="text-lg font-semibold text-blue-300 mb-4">📡 Auto-collected Data</h2>
         <div class="grid md:grid-cols-3 gap-4">
             {% if entry.integrations.weather %}
-            <div class="bg-white rounded-lg shadow-sm cursor-pointer transition-all hover:shadow-md" onclick="toggleDetails(this)">
+            <div class="bg-slate-800 rounded-lg shadow-sm cursor-pointer transition-all hover:shadow-md" onclick="toggleDetails(this)">
                 <div class="p-4">
-                    <h3 class="font-medium text-gray-700 mb-2">🌤️ Weather</h3>
+                    <h3 class="font-medium text-slate-300 mb-2">🌤️ Weather</h3>
                     <!-- Summary (always visible) -->
                     <div class="summary">
                         <p class="text-2xl font-bold">{{ entry.integrations.weather.temp_avg_c|round|int }}°C</p>
                         {% if entry.integrations.weather.description %}
-                        <p class="text-sm text-gray-600 capitalize">{{ entry.integrations.weather.description }}</p>
+                        <p class="text-sm text-slate-400 capitalize">{{ entry.integrations.weather.description }}</p>
                         {% endif %}
                         <div class="flex items-center space-x-2 text-sm">
-                            <span class="text-gray-500">{{ entry.integrations.weather.pressure_hpa|round|int }} hPa</span>
+                            <span class="text-slate-400">{{ entry.integrations.weather.pressure_hpa|round|int }} hPa</span>
                             {% if entry.integrations.weather.pressure_change_hpa %}
                                 {% if entry.integrations.weather.pressure_change_hpa > 5 %}
                                 <span class="text-orange-600 font-medium">↑{{ entry.integrations.weather.pressure_change_hpa|round(1) }}</span>
                                 {% elif entry.integrations.weather.pressure_change_hpa < -5 %}
                                 <span class="text-blue-600 font-medium">↓{{ entry.integrations.weather.pressure_change_hpa|abs|round(1) }}</span>
                                 {% elif entry.integrations.weather.pressure_change_hpa > 0 %}
-                                <span class="text-gray-500">+{{ entry.integrations.weather.pressure_change_hpa|round(1) }}</span>
+                                <span class="text-slate-400">+{{ entry.integrations.weather.pressure_change_hpa|round(1) }}</span>
                                 {% else %}
-                                <span class="text-gray-500">{{ entry.integrations.weather.pressure_change_hpa|round(1) }}</span>
+                                <span class="text-slate-400">{{ entry.integrations.weather.pressure_change_hpa|round(1) }}</span>
                                 {% endif %}
                             {% endif %}
                         </div>
                         <p class="text-xs text-blue-500 mt-2">Click for details ▼</p>
                     </div>
                     <!-- Details (hidden by default) -->
-                    <div class="details hidden mt-3 pt-3 border-t text-sm text-gray-500 space-y-1">
+                    <div class="details hidden mt-3 pt-3 border-t text-sm text-slate-400 space-y-1">
                         {% if entry.integrations.weather.temp_high_c and entry.integrations.weather.temp_low_c %}
                         <p>High/Low: <strong>{{ entry.integrations.weather.temp_high_c|round|int }}°C</strong> / {{ entry.integrations.weather.temp_low_c|round|int }}°C</p>
                         {% endif %}
@@ -76,13 +76,13 @@
             {% endif %}
             
             {% if entry.integrations.activities %}
-            <div class="bg-white rounded-lg shadow-sm cursor-pointer transition-all hover:shadow-md" onclick="toggleDetails(this)">
+            <div class="bg-slate-800 rounded-lg shadow-sm cursor-pointer transition-all hover:shadow-md" onclick="toggleDetails(this)">
                 <div class="p-4">
-                    <h3 class="font-medium text-gray-700 mb-2">🚴 Activities</h3>
+                    <h3 class="font-medium text-slate-300 mb-2">🚴 Activities</h3>
                     <!-- Summary (always visible) -->
                     <div class="summary">
                         <p class="text-2xl font-bold">{{ entry.integrations.total_activity_minutes|round|int }} min</p>
-                        <p class="text-sm text-gray-600">
+                        <p class="text-sm text-slate-400">
                             {{ entry.integrations.activities|length }} activit{{ 'y' if entry.integrations.activities|length == 1 else 'ies' }}
                             {% if entry.integrations.total_elevation_gain %}· {{ entry.integrations.total_elevation_gain|round|int }}m ↑{% endif %}
                         </p>
@@ -92,8 +92,8 @@
                     <div class="details hidden mt-3 pt-3 border-t">
                         {% for activity in entry.integrations.activities %}
                         <div class="{% if not loop.first %}mt-3 pt-3 border-t{% endif %}">
-                            <p class="font-medium text-gray-800">{{ activity.name or activity.activity_type }}</p>
-                            <div class="text-sm text-gray-500 space-y-1 mt-1">
+                            <p class="font-medium text-slate-200">{{ activity.name or activity.activity_type }}</p>
+                            <div class="text-sm text-slate-400 space-y-1 mt-1">
                                 <p>
                                     <strong>{{ activity.duration_minutes|round|int }}</strong> min
                                     {% if activity.distance_km %} · <strong>{{ activity.distance_km|round(1) }}</strong> km{% endif %}
@@ -124,23 +124,23 @@
             {% endif %}
             
             {% if entry.integrations.sleep %}
-            <div class="bg-white rounded-lg shadow-sm cursor-pointer transition-all hover:shadow-md" onclick="toggleDetails(this)">
+            <div class="bg-slate-800 rounded-lg shadow-sm cursor-pointer transition-all hover:shadow-md" onclick="toggleDetails(this)">
                 <div class="p-4">
-                    <h3 class="font-medium text-gray-700 mb-2">😴 Sleep</h3>
+                    <h3 class="font-medium text-slate-300 mb-2">😴 Sleep</h3>
                     <!-- Summary (always visible) -->
                     <div class="summary">
                         <p class="text-2xl font-bold">{{ entry.integrations.sleep.sleep_score or 'N/A' }}</p>
-                        <p class="text-sm text-gray-600">
+                        <p class="text-sm text-slate-400">
                             {{ (entry.integrations.sleep.total_sleep_minutes or 0) // 60 }}h 
                             {{ (entry.integrations.sleep.total_sleep_minutes or 0) % 60 }}m total
                         </p>
                         {% if entry.integrations.sleep.hrv_average %}
-                        <p class="text-sm text-gray-500">HRV: {{ entry.integrations.sleep.hrv_average|round|int }} ms</p>
+                        <p class="text-sm text-slate-400">HRV: {{ entry.integrations.sleep.hrv_average|round|int }} ms</p>
                         {% endif %}
                         <p class="text-xs text-blue-500 mt-2">Click for details ▼</p>
                     </div>
                     <!-- Details (hidden by default) -->
-                    <div class="details hidden mt-3 pt-3 border-t text-sm text-gray-500 space-y-1">
+                    <div class="details hidden mt-3 pt-3 border-t text-sm text-slate-400 space-y-1">
                         {% if entry.integrations.sleep.deep_sleep_minutes %}
                         <p>🟦 Deep: {{ entry.integrations.sleep.deep_sleep_minutes }} min ({{ ((entry.integrations.sleep.deep_sleep_minutes or 0) / (entry.integrations.sleep.total_sleep_minutes or 1) * 100)|round|int }}%)</p>
                         {% endif %}
@@ -163,7 +163,7 @@
                         <p>Breathing: {{ entry.integrations.sleep.respiratory_rate|round(1) }}/min</p>
                         {% endif %}
                         {% if entry.integrations.sleep.bedtime and entry.integrations.sleep.wake_time %}
-                        <p class="text-xs text-gray-400 mt-2">
+                        <p class="text-xs text-slate-500 mt-2">
                             🛏️ {{ entry.integrations.sleep.bedtime.strftime('%H:%M') }} → {{ entry.integrations.sleep.wake_time.strftime('%H:%M') }}
                         </p>
                         {% endif %}
@@ -192,10 +192,10 @@
     {% endif %}
     
     <!-- Quick Log Section -->
-    <div class="bg-amber-50 rounded-xl p-6 mb-6">
+    <div class="bg-amber-900/30 border border-amber-800 rounded-xl p-6 mb-6">
         <div class="flex justify-between items-center mb-4">
-            <h2 class="text-lg font-semibold text-amber-800">⚡ Quick Log</h2>
-            <div class="text-sm text-amber-600">
+            <h2 class="text-lg font-semibold text-amber-400">⚡ Quick Log</h2>
+            <div class="text-sm text-amber-500">
                 {% if quick_log_totals %}
                 <span class="mr-4">☕ {{ quick_log_totals.total_caffeine_mg|round|int }}mg caffeine</span>
                 {% if quick_log_totals.total_alcohol_units > 0 %}
@@ -207,8 +207,8 @@
         
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             {% for category in routine_categories %}
-            <div class="bg-white rounded-lg p-4 shadow-sm">
-                <h3 class="font-medium text-gray-700 mb-3">{{ category.title }}</h3>
+            <div class="bg-slate-800 rounded-lg p-4 shadow-sm">
+                <h3 class="font-medium text-slate-300 mb-3">{{ category.title }}</h3>
                 <div class="space-y-3">
                     {% for item in category['items'] %}
                     {% if category.type == 'checkbox' %}
@@ -219,8 +219,8 @@
                                id="check-{{ item.id }}"
                                {% if is_checked %}checked{% endif %}
                                onchange="updateQuickLogCheckbox('{{ item.id }}', this.checked)"
-                               class="w-5 h-5 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
-                        <span class="{% if is_checked %}text-amber-700 font-medium{% else %}text-gray-700{% endif %}">
+                               class="w-5 h-5 rounded border-slate-600 text-amber-500 focus:ring-amber-500">
+                        <span class="{% if is_checked %}text-amber-400 font-medium{% else %}text-slate-300{% endif %}">
                             {{ item.name }}
                         </span>
                     </label>
@@ -230,21 +230,23 @@
                     {% set increment = item.increment|default(1) %}
                     <div class="flex items-center justify-between">
                         <div>
-                            <span class="font-medium text-gray-800">{{ item.name }}</span>
+                            <span class="font-medium text-slate-200">{{ item.name }}</span>
                             {% if item.description %}
-                            <span class="text-xs text-gray-500 ml-1">{{ item.description }}</span>
+                            <span class="text-xs text-slate-400 ml-1">{{ item.description }}</span>
                             {% elif item.dosage %}
-                            <span class="text-xs text-gray-500 ml-1">{{ item.dosage }}</span>
+                            <span class="text-xs text-slate-400 ml-1">{{ item.dosage }}</span>
                             {% endif %}
                         </div>
                         <div class="flex items-center space-x-2">
                             <button type="button" 
                                     onclick="updateQuickLog('{{ item.id }}', {{ -increment }})"
-                                    class="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold flex items-center justify-center">
+                                    class="w-8 h-8 rounded-full bg-slate-600 hover:bg-slate-500 text-slate-300 font-bold flex items-center justify-center">
                                 −
                             </button>
                             <span id="count-{{ item.id }}" 
-                                  class="w-10 text-center font-mono text-lg {% if item_count > 0 %}text-amber-700 font-bold{% else %}text-gray-400{% endif %}">
+                                  class="w-10 text-center font-mono text-lg {% if item_count > 0 %}text-amber-400 font-bold{% else %}text-slate-500{% endif %}"
+                                  data-highlight-class="text-amber-400"
+                                  data-normal-class="text-slate-500">
                                 {{ item_count if item_count == item_count|int else item_count|round(1) }}
                             </span>
                             <button type="button" 
@@ -262,10 +264,10 @@
         </div>
         
         <div class="mt-4 flex justify-between items-center text-sm">
-            <button type="button" onclick="resetToDefaults()" class="text-gray-500 hover:text-gray-700">
+            <button type="button" onclick="resetToDefaults()" class="text-slate-400 hover:text-slate-300">
                 ↺ Reset to defaults
             </button>
-            <button type="button" onclick="clearAllCounts()" class="text-red-500 hover:text-red-700">
+            <button type="button" onclick="clearAllCounts()" class="text-red-500 hover:text-red-400">
                 Clear all
             </button>
         </div>
@@ -284,7 +286,7 @@
         countEl.textContent = Number.isInteger(newCount) ? newCount : newCount.toFixed(1);
         countEl.className = newCount > 0 
             ? 'w-10 text-center font-mono text-lg text-amber-700 font-bold'
-            : 'w-10 text-center font-mono text-lg text-gray-400';
+            : 'w-10 text-center font-mono text-lg text-slate-500';
         
         // Send to server
         try {
@@ -315,7 +317,7 @@
         if (isChecked) {
             labelSpan.className = 'text-amber-700 font-medium';
         } else {
-            labelSpan.className = 'text-gray-700';
+            labelSpan.className = 'text-slate-300';
         }
         
         // Send to server (1 for checked, 0 for unchecked)
@@ -395,7 +397,7 @@
     </script>
     
     <!-- Voice Recording Section -->
-    <div class="bg-purple-50 rounded-xl p-6 mb-6">
+    <div class="bg-purple-900/30 rounded-xl p-6 mb-6">
         <div class="flex justify-between items-center">
             <h2 class="text-lg font-semibold text-purple-800">🎤 Voice Notes</h2>
             <button type="button" onclick="openRecordingModal()" 
@@ -406,25 +408,25 @@
         <p class="text-sm text-purple-600 mt-2">Record a voice note about your day — it will be transcribed and added to your notes.</p>
         
         {% if entry.general_notes %}
-        <div class="mt-4 p-4 bg-white rounded-lg">
-            <h4 class="font-medium text-gray-700 mb-2">Current Notes:</h4>
-            <p class="text-gray-600">{{ entry.general_notes }}</p>
+        <div class="mt-4 p-4 bg-slate-800 rounded-lg">
+            <h4 class="font-medium text-slate-300 mb-2">Current Notes:</h4>
+            <p class="text-slate-400">{{ entry.general_notes }}</p>
         </div>
         {% endif %}
     </div>
     
     <!-- Recording Modal -->
     <div id="recording-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white rounded-xl p-8 max-w-lg w-full mx-4 shadow-2xl">
+        <div class="bg-slate-800 rounded-xl p-8 max-w-lg w-full mx-4 shadow-2xl">
             <div class="flex justify-between items-center mb-6">
-                <h3 class="text-xl font-bold text-gray-800">🎤 Record Voice Note</h3>
-                <button onclick="closeRecordingModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                <h3 class="text-xl font-bold text-slate-200">🎤 Record Voice Note</h3>
+                <button onclick="closeRecordingModal()" class="text-slate-400 hover:text-slate-300 text-2xl">&times;</button>
             </div>
             
             <!-- Recording Guide -->
-            <div class="bg-gray-50 rounded-lg p-4 mb-6">
-                <h4 class="font-medium text-gray-700 mb-2">💡 What I can extract from your voice note:</h4>
-                <ul class="text-sm text-gray-600 space-y-1">
+            <div class="bg-slate-900 rounded-lg p-4 mb-6">
+                <h4 class="font-medium text-slate-300 mb-2">💡 What I can extract from your voice note:</h4>
+                <ul class="text-sm text-slate-400 space-y-1">
                     <li>• <strong>Meals:</strong> "I had eggs and toast for breakfast, coffee around 8am"</li>
                     <li>• <strong>Medications:</strong> "Took 100mg of sumatriptan for a headache"</li>
                     <li>• <strong>Supplements:</strong> "Had my vitamin D and magnesium this morning"</li>
@@ -433,24 +435,24 @@
                     <li>• <strong>Sleep:</strong> "Slept okay, woke up once during the night"</li>
                     <li>• <strong>Exercise:</strong> "Went for a 30 minute bike ride"</li>
                 </ul>
-                <p class="text-xs text-gray-500 mt-2">Just speak naturally - I'll parse and organize everything!</p>
+                <p class="text-xs text-slate-400 mt-2">Just speak naturally - I'll parse and organize everything!</p>
             </div>
             
             <!-- Recording Controls -->
             <div class="text-center mb-6">
-                <div id="recording-status" class="text-gray-500 mb-4">Ready to record</div>
+                <div id="recording-status" class="text-slate-400 mb-4">Ready to record</div>
                 
                 <div id="recording-timer" class="text-3xl font-mono text-purple-600 mb-4 hidden">00:00</div>
                 
                 <div class="flex justify-center space-x-4">
                     <button id="start-recording-btn" onclick="startRecording()" 
-                            class="bg-red-500 text-white px-6 py-3 rounded-full hover:bg-red-600 flex items-center space-x-2">
+                            class="bg-red-900/300 text-white px-6 py-3 rounded-full hover:bg-red-600 flex items-center space-x-2">
                         <span class="text-xl">⏺</span>
                         <span>Start Recording</span>
                     </button>
                     
                     <button id="stop-recording-btn" onclick="stopRecording()" 
-                            class="bg-gray-500 text-white px-6 py-3 rounded-full hover:bg-gray-600 hidden flex items-center space-x-2">
+                            class="bg-slate-900 text-white px-6 py-3 rounded-full hover:bg-slate-500 hidden flex items-center space-x-2">
                         <span class="text-xl">⏹</span>
                         <span>Stop</span>
                     </button>
@@ -463,7 +465,7 @@
                 
                 <div class="flex space-x-4">
                     <button onclick="discardRecording()" 
-                            class="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300">
+                            class="flex-1 bg-slate-600 text-slate-300 px-4 py-2 rounded hover:bg-slate-500">
                         Discard
                     </button>
                     <button onclick="transcribeRecording()" 
@@ -476,8 +478,8 @@
             <!-- Transcription Progress -->
             <div id="transcription-progress" class="hidden text-center">
                 <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-2"></div>
-                <p class="text-gray-600">Transcribing & extracting data...</p>
-                <p class="text-xs text-gray-400 mt-1">This may take a few seconds</p>
+                <p class="text-slate-400">Transcribing & extracting data...</p>
+                <p class="text-xs text-slate-500 mt-1">This may take a few seconds</p>
             </div>
         </div>
     </div>
@@ -623,7 +625,7 @@
     </script>
     
     <!-- Daily Assessment -->
-    <div class="bg-white rounded-xl shadow p-6 mb-6">
+    <div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
         <h2 class="text-xl font-semibold mb-4">📊 Daily Assessment</h2>
         <form action="/entries/save" method="post">
             <input type="hidden" name="entry_date" value="{{ entry.entry_date.isoformat() }}">
@@ -634,7 +636,7 @@
             
             <div class="grid md:grid-cols-3 gap-6 mb-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                    <label class="block text-sm font-medium text-slate-300 mb-2">
                         Overall Wellbeing (1-10)
                     </label>
                     <input type="range" name="overall_wellbeing" 
@@ -642,14 +644,14 @@
                            value="{{ wellbeing_val }}"
                            class="w-full"
                            oninput="this.nextElementSibling.textContent = this.value">
-                    <span class="text-lg font-bold text-indigo-600">{{ wellbeing_val }}</span>
+                    <span class="text-lg font-bold text-indigo-400">{{ wellbeing_val }}</span>
                     {% if not entry.overall_wellbeing and prev_defaults.overall_wellbeing %}
-                    <span class="text-xs text-gray-400 ml-2">(from yesterday)</span>
+                    <span class="text-xs text-slate-500 ml-2">(from yesterday)</span>
                     {% endif %}
                 </div>
                 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                    <label class="block text-sm font-medium text-slate-300 mb-2">
                         Energy Level (1-10)
                     </label>
                     <input type="range" name="energy_level" 
@@ -657,14 +659,14 @@
                            value="{{ energy_val }}"
                            class="w-full"
                            oninput="this.nextElementSibling.textContent = this.value">
-                    <span class="text-lg font-bold text-indigo-600">{{ energy_val }}</span>
+                    <span class="text-lg font-bold text-indigo-400">{{ energy_val }}</span>
                     {% if not entry.energy_level and prev_defaults.energy_level %}
-                    <span class="text-xs text-gray-400 ml-2">(from yesterday)</span>
+                    <span class="text-xs text-slate-500 ml-2">(from yesterday)</span>
                     {% endif %}
                 </div>
                 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                    <label class="block text-sm font-medium text-slate-300 mb-2">
                         Stress Level (1-10)
                     </label>
                     <input type="range" name="stress_level" 
@@ -672,17 +674,17 @@
                            value="{{ stress_val }}"
                            class="w-full"
                            oninput="this.nextElementSibling.textContent = this.value">
-                    <span class="text-lg font-bold text-indigo-600">{{ stress_val }}</span>
+                    <span class="text-lg font-bold text-indigo-400">{{ stress_val }}</span>
                     {% if not entry.stress_level and prev_defaults.stress_level %}
-                    <span class="text-xs text-gray-400 ml-2">(from yesterday)</span>
+                    <span class="text-xs text-slate-500 ml-2">(from yesterday)</span>
                     {% endif %}
                 </div>
             </div>
             
             <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+                <label class="block text-sm font-medium text-slate-300 mb-2">Notes</label>
                 <textarea name="general_notes" rows="3" 
-                          class="w-full border rounded-lg px-3 py-2"
+                          class="w-full border border-slate-600 rounded-lg px-3 py-2"
                           placeholder="How are you feeling today?">{{ entry.general_notes or '' }}</textarea>
             </div>
             
@@ -694,7 +696,7 @@
     </div>
     
     <!-- Symptoms Section -->
-    <div class="bg-white rounded-xl shadow p-6 mb-6">
+    <div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
         <h2 class="text-xl font-semibold mb-4">🤕 Symptoms</h2>
         
         {% if entry.symptoms %}
@@ -704,13 +706,13 @@
                 <div class="flex-grow">
                     <span class="font-medium">{{ symptom.display_type }}</span>
                     {% if symptom.display_location %}
-                    <span class="text-gray-600">- {{ symptom.display_location }}</span>
+                    <span class="text-slate-400">- {{ symptom.display_location }}</span>
                     {% endif %}
                     {% if symptom.onset_time %}
-                    <span class="text-sm text-gray-500 ml-2">at {{ symptom.onset_time.strftime('%H:%M') }}</span>
+                    <span class="text-sm text-slate-400 ml-2">at {{ symptom.onset_time.strftime('%H:%M') }}</span>
                     {% endif %}
                     {% if symptom.notes %}
-                    <p class="text-sm text-gray-600">{{ symptom.notes }}</p>
+                    <p class="text-sm text-slate-400">{{ symptom.notes }}</p>
                     {% endif %}
                 </div>
                 <div class="flex items-center space-x-3">
@@ -719,7 +721,7 @@
                           onsubmit="return confirm('Delete this symptom?');">
                         <input type="hidden" name="entry_date" value="{{ entry.entry_date.isoformat() }}">
                         <input type="hidden" name="symptom_index" value="{{ loop.index0 }}">
-                        <button type="submit" class="text-red-500 hover:text-red-700 text-sm px-2 py-1" title="Delete symptom">
+                        <button type="submit" class="text-red-500 hover:text-red-400 text-sm px-2 py-1" title="Delete symptom">
                             ✕
                         </button>
                     </form>
@@ -728,11 +730,11 @@
             {% endfor %}
         </div>
         {% else %}
-        <p class="text-gray-500 text-sm mb-4">No symptoms logged yet today ✓</p>
+        <p class="text-slate-400 text-sm mb-4">No symptoms logged yet today ✓</p>
         {% endif %}
         
-        <details class="border rounded-lg">
-            <summary class="px-4 py-3 cursor-pointer bg-gray-50 hover:bg-gray-100 rounded-lg font-medium">
+        <details class="border border-slate-600 rounded-lg">
+            <summary class="px-4 py-3 cursor-pointer bg-slate-900 hover:bg-slate-700 rounded-lg font-medium">
                 + Add Symptom
             </summary>
             <form action="/entries/symptom" method="post" class="p-4 space-y-4">
@@ -740,8 +742,8 @@
                 
                 <div class="grid md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                        <select name="symptom_type" required class="w-full border rounded px-3 py-2">
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Type</label>
+                        <select name="symptom_type" required class="w-full border border-slate-600 rounded px-3 py-2">
                             {% for stype in symptom_types %}
                             <option value="{{ stype.value }}">{{ stype.value.replace('_', ' ').title() }}</option>
                             {% endfor %}
@@ -749,14 +751,14 @@
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Severity (0-10)</label>
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Severity (0-10)</label>
                         <input type="number" name="severity" min="0" max="10" value="5" required
-                               class="w-full border rounded px-3 py-2">
+                               class="w-full border border-slate-600 rounded px-3 py-2">
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Location (optional)</label>
-                        <select name="location" class="w-full border rounded px-3 py-2">
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Location (optional)</label>
+                        <select name="location" class="w-full border border-slate-600 rounded px-3 py-2">
                             <option value="">-- None --</option>
                             {% for loc in body_locations %}
                             <option value="{{ loc.value }}">{{ loc.value.replace('_', ' ').title() }}</option>
@@ -765,18 +767,18 @@
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Onset Time</label>
-                        <input type="time" name="onset_time" class="w-full border rounded px-3 py-2">
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Onset Time</label>
+                        <input type="time" name="onset_time" class="w-full border border-slate-600 rounded px-3 py-2">
                     </div>
                 </div>
                 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-                    <input type="text" name="notes" class="w-full border rounded px-3 py-2"
+                    <label class="block text-sm font-medium text-slate-300 mb-1">Notes</label>
+                    <input type="text" name="notes" class="w-full border border-slate-600 rounded px-3 py-2"
                            placeholder="Any additional details">
                 </div>
                 
-                <button type="submit" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+                <button type="submit" class="bg-red-900/300 text-white px-4 py-2 rounded hover:bg-red-600">
                     Add Symptom
                 </button>
             </form>
@@ -784,26 +786,26 @@
     </div>
     
     <!-- Incidents Section -->
-    <div class="bg-white rounded-xl shadow p-6 mb-6">
+    <div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
         <h2 class="text-xl font-semibold mb-4">⚠️ Incidents</h2>
         
         {% if entry.incidents %}
         <div class="mb-4 space-y-2">
             {% for incident in entry.incidents %}
-            <div class="p-3 rounded-lg bg-yellow-50 border border-yellow-200">
+            <div class="p-3 rounded-lg bg-yellow-900/30 border border-yellow-700">
                 <div class="flex justify-between items-start">
                     <div class="flex-grow">
                         <div class="flex justify-between">
                             <span class="font-medium">{{ incident.display_type }}</span>
-                            <span class="text-sm text-gray-500">{{ incident.location.value.replace('_', ' ').title() }}</span>
+                            <span class="text-sm text-slate-400">{{ incident.location.value.replace('_', ' ').title() }}</span>
                         </div>
-                        <p class="text-gray-700">{{ incident.description }}</p>
+                        <p class="text-slate-300">{{ incident.description }}</p>
                     </div>
                     <form action="/entries/incident/delete" method="post" class="inline ml-2"
                           onsubmit="return confirm('Delete this incident?');">
                         <input type="hidden" name="entry_date" value="{{ entry.entry_date.isoformat() }}">
                         <input type="hidden" name="incident_index" value="{{ loop.index0 }}">
-                        <button type="submit" class="text-red-500 hover:text-red-700 text-sm px-2 py-1" title="Delete incident">
+                        <button type="submit" class="text-red-500 hover:text-red-400 text-sm px-2 py-1" title="Delete incident">
                             ✕
                         </button>
                     </form>
@@ -812,11 +814,11 @@
             {% endfor %}
         </div>
         {% else %}
-        <p class="text-gray-500 text-sm mb-4">No incidents logged today ✓</p>
+        <p class="text-slate-400 text-sm mb-4">No incidents logged today ✓</p>
         {% endif %}
         
-        <details class="border rounded-lg">
-            <summary class="px-4 py-3 cursor-pointer bg-gray-50 hover:bg-gray-100 rounded-lg font-medium">
+        <details class="border border-slate-600 rounded-lg">
+            <summary class="px-4 py-3 cursor-pointer bg-slate-900 hover:bg-slate-700 rounded-lg font-medium">
                 + Add Incident
             </summary>
             <form action="/entries/incident" method="post" class="p-4 space-y-4">
@@ -824,8 +826,8 @@
                 
                 <div class="grid md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                        <select name="incident_type" required class="w-full border rounded px-3 py-2">
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Type</label>
+                        <select name="incident_type" required class="w-full border border-slate-600 rounded px-3 py-2">
                             {% for itype in incident_types %}
                             <option value="{{ itype.value }}">{{ itype.value.title() }}</option>
                             {% endfor %}
@@ -833,8 +835,8 @@
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Body Location</label>
-                        <select name="location" required class="w-full border rounded px-3 py-2">
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Body Location</label>
+                        <select name="location" required class="w-full border border-slate-600 rounded px-3 py-2">
                             {% for loc in body_locations %}
                             <option value="{{ loc.value }}">{{ loc.value.replace('_', ' ').title() }}</option>
                             {% endfor %}
@@ -842,25 +844,25 @@
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Severity</label>
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Severity</label>
                         <input type="number" name="severity" min="0" max="10" value="3" required
-                               class="w-full border rounded px-3 py-2">
+                               class="w-full border border-slate-600 rounded px-3 py-2">
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Time</label>
-                        <input type="time" name="time_occurred" class="w-full border rounded px-3 py-2">
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Time</label>
+                        <input type="time" name="time_occurred" class="w-full border border-slate-600 rounded px-3 py-2">
                     </div>
                 </div>
                 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">What happened?</label>
+                    <label class="block text-sm font-medium text-slate-300 mb-1">What happened?</label>
                     <textarea name="description" required rows="2"
-                              class="w-full border rounded px-3 py-2"
+                              class="w-full border border-slate-600 rounded px-3 py-2"
                               placeholder="Describe the incident"></textarea>
                 </div>
                 
-                <button type="submit" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600">
+                <button type="submit" class="bg-yellow-900/300 text-white px-4 py-2 rounded hover:bg-yellow-600">
                     Add Incident
                 </button>
             </form>
@@ -868,25 +870,25 @@
     </div>
     
     <!-- Meals Section -->
-    <div class="bg-white rounded-xl shadow p-6 mb-6">
+    <div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
         <h2 class="text-xl font-semibold mb-4">🍽️ Meals & Drinks</h2>
         
         {% if meals_with_ids %}
         <div class="mb-4 space-y-2">
             {% for item in meals_with_ids %}
             {% set meal = item.meal %}
-            <div class="p-3 rounded-lg bg-green-50 border border-green-200">
+            <div class="p-3 rounded-lg bg-green-900/30 border border-green-700">
                 <div class="flex justify-between items-start">
                     <div class="flex-grow">
                         <div class="flex items-center space-x-2">
                             <span class="font-medium capitalize">{{ meal.meal_type.value }}</span>
                             {% if meal.time_consumed %}
-                            <span class="text-sm text-gray-500">at {{ meal.time_consumed.strftime('%H:%M') }}</span>
+                            <span class="text-sm text-slate-400">at {{ meal.time_consumed.strftime('%H:%M') }}</span>
                             {% endif %}
                         </div>
-                        <p class="text-gray-700">{{ meal.description }}</p>
+                        <p class="text-slate-300">{{ meal.description }}</p>
                         {% if meal.calories %}
-                        <p class="text-xs text-gray-500 mt-1">
+                        <p class="text-xs text-slate-400 mt-1">
                             {{ meal.calories|round|int }} cal
                             {% if meal.protein_g %} · {{ meal.protein_g|round|int }}g protein{% endif %}
                             {% if meal.carbs_g %} · {{ meal.carbs_g|round|int }}g carbs{% endif %}
@@ -896,7 +898,7 @@
                     </div>
                     <div class="flex items-center space-x-2">
                         {% if meal.contains_alcohol %}
-                        <span class="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">🍷 {{ meal.alcohol_units }} units</span>
+                        <span class="text-xs bg-purple-900/50 text-purple-800 px-2 py-1 rounded">🍷 {{ meal.alcohol_units }} units</span>
                         {% endif %}
                         {% if meal.contains_caffeine %}
                         <span class="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">☕ Caffeine</span>
@@ -905,7 +907,7 @@
                               onsubmit="return confirm('Delete this meal?');">
                             <input type="hidden" name="meal_id" value="{{ item.id }}">
                             <input type="hidden" name="entry_date" value="{{ entry.entry_date.isoformat() }}">
-                            <button type="submit" class="text-red-500 hover:text-red-700 text-sm px-2 py-1" title="Delete meal">
+                            <button type="submit" class="text-red-500 hover:text-red-400 text-sm px-2 py-1" title="Delete meal">
                                 ✕
                             </button>
                         </form>
@@ -915,11 +917,11 @@
             {% endfor %}
         </div>
         {% else %}
-        <p class="text-gray-500 text-sm mb-4">No meals logged yet today</p>
+        <p class="text-slate-400 text-sm mb-4">No meals logged yet today</p>
         {% endif %}
         
-        <details class="border rounded-lg">
-            <summary class="px-4 py-3 cursor-pointer bg-gray-50 hover:bg-gray-100 rounded-lg font-medium">
+        <details class="border border-slate-600 rounded-lg">
+            <summary class="px-4 py-3 cursor-pointer bg-slate-900 hover:bg-slate-700 rounded-lg font-medium">
                 + Add Meal/Drink
             </summary>
             <form action="/entries/meal" method="post" class="p-4 space-y-4">
@@ -927,8 +929,8 @@
                 
                 <div class="grid md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                        <select name="meal_type" required class="w-full border rounded px-3 py-2">
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Type</label>
+                        <select name="meal_type" required class="w-full border border-slate-600 rounded px-3 py-2">
                             {% for mtype in meal_types %}
                             <option value="{{ mtype.value }}">{{ mtype.value.title() }}</option>
                             {% endfor %}
@@ -936,15 +938,15 @@
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Time</label>
-                        <input type="time" name="time_consumed" class="w-full border rounded px-3 py-2">
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Time</label>
+                        <input type="time" name="time_consumed" class="w-full border border-slate-600 rounded px-3 py-2">
                     </div>
                 </div>
                 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">What did you eat/drink?</label>
+                    <label class="block text-sm font-medium text-slate-300 mb-1">What did you eat/drink?</label>
                     <input type="text" name="description" required
-                           class="w-full border rounded px-3 py-2"
+                           class="w-full border border-slate-600 rounded px-3 py-2"
                            placeholder="e.g., Eggs, toast, coffee">
                 </div>
                 
@@ -961,12 +963,12 @@
                 </div>
                 
                 <div id="alcohol-units" class="hidden">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Standard drinks</label>
+                    <label class="block text-sm font-medium text-slate-300 mb-1">Standard drinks</label>
                     <input type="number" name="alcohol_units" step="0.5" min="0" value="1"
-                           class="w-32 border rounded px-3 py-2">
+                           class="w-32 border border-slate-600 rounded px-3 py-2">
                 </div>
                 
-                <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                <button type="submit" class="bg-green-900/300 text-white px-4 py-2 rounded hover:bg-green-600">
                     Add Meal
                 </button>
             </form>
@@ -974,17 +976,17 @@
     </div>
     
     <!-- Medications Section -->
-    <div class="bg-white rounded-xl shadow p-6 mb-6">
+    <div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
         <h2 class="text-xl font-semibold mb-4">💊 Medications</h2>
         
         {% if entry.medications %}
         <div class="mb-4 space-y-2">
             {% for med in entry.medications %}
-            <div class="p-3 rounded-lg bg-blue-50 border border-blue-200">
+            <div class="p-3 rounded-lg bg-blue-900/30 border border-blue-700">
                 <div class="flex justify-between items-start">
                     <div class="flex-grow">
                         <p class="font-medium text-blue-900">{{ med.name }}</p>
-                        <p class="text-sm text-blue-700">
+                        <p class="text-sm text-blue-400">
                             {% if med.dosage %}{{ med.dosage }}{% endif %}
                             {% if med.form %} ({{ med.form.value }}){% endif %}
                             {% if med.time_taken %} at {{ med.time_taken.strftime('%H:%M') }}{% endif %}
@@ -997,7 +999,7 @@
                           onsubmit="return confirm('Delete this medication?');">
                         <input type="hidden" name="entry_date" value="{{ entry.entry_date.isoformat() }}">
                         <input type="hidden" name="medication_index" value="{{ loop.index0 }}">
-                        <button type="submit" class="text-red-500 hover:text-red-700 text-sm px-2 py-1" title="Delete medication">
+                        <button type="submit" class="text-red-500 hover:text-red-400 text-sm px-2 py-1" title="Delete medication">
                             ✕
                         </button>
                     </form>
@@ -1006,11 +1008,11 @@
             {% endfor %}
         </div>
         {% else %}
-        <p class="text-gray-500 text-sm mb-4">No medications logged yet today</p>
+        <p class="text-slate-400 text-sm mb-4">No medications logged yet today</p>
         {% endif %}
         
-        <details class="border rounded-lg">
-            <summary class="px-4 py-3 cursor-pointer bg-gray-50 hover:bg-gray-100 rounded-lg font-medium">
+        <details class="border border-slate-600 rounded-lg">
+            <summary class="px-4 py-3 cursor-pointer bg-slate-900 hover:bg-slate-700 rounded-lg font-medium">
                 + Add Medication
             </summary>
             <form action="/entries/medication" method="post" class="p-4 space-y-4">
@@ -1018,22 +1020,22 @@
                 
                 <div class="grid md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Medication Name</label>
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Medication Name</label>
                         <input type="text" name="name" required
-                               class="w-full border rounded px-3 py-2"
+                               class="w-full border border-slate-600 rounded px-3 py-2"
                                placeholder="e.g., Sumatriptan, Ibuprofen">
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Dosage</label>
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Dosage</label>
                         <input type="text" name="dosage"
-                               class="w-full border rounded px-3 py-2"
+                               class="w-full border border-slate-600 rounded px-3 py-2"
                                placeholder="e.g., 100mg, 2 tablets">
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Form</label>
-                        <select name="form" class="w-full border rounded px-3 py-2">
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Form</label>
+                        <select name="form" class="w-full border border-slate-600 rounded px-3 py-2">
                             <option value="">-- Select --</option>
                             <option value="tablet">Tablet</option>
                             <option value="capsule">Capsule</option>
@@ -1048,18 +1050,18 @@
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Time Taken</label>
-                        <input type="time" name="time_taken" class="w-full border rounded px-3 py-2">
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Time Taken</label>
+                        <input type="time" name="time_taken" class="w-full border border-slate-600 rounded px-3 py-2">
                     </div>
                 </div>
                 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Reason (optional)</label>
-                    <input type="text" name="reason" class="w-full border rounded px-3 py-2"
+                    <label class="block text-sm font-medium text-slate-300 mb-1">Reason (optional)</label>
+                    <input type="text" name="reason" class="w-full border border-slate-600 rounded px-3 py-2"
                            placeholder="e.g., headache, prevention">
                 </div>
                 
-                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                <button type="submit" class="bg-blue-900/300 text-white px-4 py-2 rounded hover:bg-blue-600">
                     Add Medication
                 </button>
             </form>
@@ -1067,17 +1069,17 @@
     </div>
     
     <!-- Supplements Section -->
-    <div class="bg-white rounded-xl shadow p-6 mb-6">
+    <div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
         <h2 class="text-xl font-semibold mb-4">🌿 Supplements</h2>
         
         {% if entry.supplements %}
         <div class="mb-4 space-y-2">
             {% for supp in entry.supplements %}
-            <div class="p-3 rounded-lg bg-green-50 border border-green-200">
+            <div class="p-3 rounded-lg bg-green-900/30 border border-green-700">
                 <div class="flex justify-between items-start">
                     <div class="flex-grow">
                         <p class="font-medium text-green-900">{{ supp.name }}</p>
-                        <p class="text-sm text-green-700">
+                        <p class="text-sm text-green-400">
                             {% if supp.dosage %}{{ supp.dosage }}{% endif %}
                             {% if supp.time_taken %} at {{ supp.time_taken.strftime('%H:%M') }}{% endif %}
                         </p>
@@ -1086,7 +1088,7 @@
                           onsubmit="return confirm('Delete this supplement?');">
                         <input type="hidden" name="entry_date" value="{{ entry.entry_date.isoformat() }}">
                         <input type="hidden" name="supplement_index" value="{{ loop.index0 }}">
-                        <button type="submit" class="text-red-500 hover:text-red-700 text-sm px-2 py-1" title="Delete supplement">
+                        <button type="submit" class="text-red-500 hover:text-red-400 text-sm px-2 py-1" title="Delete supplement">
                             ✕
                         </button>
                     </form>
@@ -1095,11 +1097,11 @@
             {% endfor %}
         </div>
         {% else %}
-        <p class="text-gray-500 text-sm mb-4">No supplements logged yet today</p>
+        <p class="text-slate-400 text-sm mb-4">No supplements logged yet today</p>
         {% endif %}
         
-        <details class="border rounded-lg">
-            <summary class="px-4 py-3 cursor-pointer bg-gray-50 hover:bg-gray-100 rounded-lg font-medium">
+        <details class="border border-slate-600 rounded-lg">
+            <summary class="px-4 py-3 cursor-pointer bg-slate-900 hover:bg-slate-700 rounded-lg font-medium">
                 + Add Supplement
             </summary>
             <form action="/entries/supplement" method="post" class="p-4 space-y-4">
@@ -1107,26 +1109,26 @@
                 
                 <div class="grid md:grid-cols-3 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Supplement Name</label>
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Supplement Name</label>
                         <input type="text" name="name" required
-                               class="w-full border rounded px-3 py-2"
+                               class="w-full border border-slate-600 rounded px-3 py-2"
                                placeholder="e.g., Vitamin D, Magnesium">
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Dosage</label>
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Dosage</label>
                         <input type="text" name="dosage"
-                               class="w-full border rounded px-3 py-2"
+                               class="w-full border border-slate-600 rounded px-3 py-2"
                                placeholder="e.g., 1000 IU, 400mg">
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Time Taken</label>
-                        <input type="time" name="time_taken" class="w-full border rounded px-3 py-2">
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Time Taken</label>
+                        <input type="time" name="time_taken" class="w-full border border-slate-600 rounded px-3 py-2">
                     </div>
                 </div>
                 
-                <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                <button type="submit" class="bg-green-900/300 text-white px-4 py-2 rounded hover:bg-green-600">
                     Add Supplement
                 </button>
             </form>
@@ -1135,7 +1137,7 @@
     
     <!-- Complete Entry -->
     <div class="flex justify-between items-center">
-        <a href="/entries/" class="text-gray-500 hover:text-gray-700">← Back to entries</a>
+        <a href="/entries/" class="text-slate-400 hover:text-slate-300">← Back to entries</a>
         
         {% if not entry.is_complete %}
         <form action="/entries/complete" method="post">
@@ -1145,7 +1147,7 @@
             </button>
         </form>
         {% else %}
-        <span class="text-green-600 font-medium">✓ Entry Complete</span>
+        <span class="text-green-400 font-medium">✓ Entry Complete</span>
         {% endif %}
     </div>
 </div>

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +7,24 @@
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: {
+                            bg: '#0f172a',
+                            card: '#1e293b',
+                            border: '#334155',
+                            text: '#e2e8f0',
+                            muted: '#94a3b8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     
     <!-- htmx for dynamic updates -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
@@ -15,35 +33,59 @@
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     
     <style>
-        .severity-0 { background-color: #e8f5e9; }
-        .severity-1 { background-color: #c8e6c9; }
-        .severity-2 { background-color: #a5d6a7; }
-        .severity-3 { background-color: #fff9c4; }
-        .severity-4 { background-color: #fff176; }
-        .severity-5 { background-color: #ffcc80; }
-        .severity-6 { background-color: #ffab91; }
-        .severity-7 { background-color: #ef9a9a; }
-        .severity-8 { background-color: #e57373; }
-        .severity-9 { background-color: #ef5350; }
-        .severity-10 { background-color: #f44336; color: white; }
+        body { background-color: #0f172a; color: #e2e8f0; }
+        .severity-0 { background-color: #064e3b; color: #d1fae5; }
+        .severity-1 { background-color: #065f46; color: #d1fae5; }
+        .severity-2 { background-color: #047857; color: #d1fae5; }
+        .severity-3 { background-color: #854d0e; color: #fef3c7; }
+        .severity-4 { background-color: #a16207; color: #fef3c7; }
+        .severity-5 { background-color: #c2410c; color: #ffedd5; }
+        .severity-6 { background-color: #dc2626; color: #fee2e2; }
+        .severity-7 { background-color: #b91c1c; color: #fee2e2; }
+        .severity-8 { background-color: #991b1b; color: #fee2e2; }
+        .severity-9 { background-color: #7f1d1d; color: #fecaca; }
+        .severity-10 { background-color: #450a0a; color: #fca5a5; }
+        
+        /* Dark mode form inputs */
+        input, select, textarea {
+            background-color: #1e293b !important;
+            border-color: #475569 !important;
+            color: #e2e8f0 !important;
+        }
+        input:focus, select:focus, textarea:focus {
+            border-color: #6366f1 !important;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+        }
+        input::placeholder, textarea::placeholder {
+            color: #64748b !important;
+        }
+        
+        /* Dark mode tables */
+        table { border-color: #334155; }
+        th { background-color: #1e293b; color: #94a3b8; }
+        td { border-color: #334155; }
+        
+        /* Plotly dark theme */
+        .js-plotly-plot .plotly .modebar { background-color: transparent !important; }
     </style>
     
     {% block head %}{% endblock %}
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-slate-900 min-h-screen text-slate-200">
     <!-- Navigation -->
-    <nav class="bg-indigo-600 text-white shadow-lg">
+    <nav class="bg-slate-800 text-white shadow-lg border-b border-slate-700">
         <div class="max-w-7xl mx-auto px-4">
             <div class="flex justify-between items-center h-16">
-                <a href="/" class="text-xl font-bold">📔 Daily Health Diary</a>
+                <a href="/" class="text-xl font-bold text-indigo-400">📔 Daily Health Diary</a>
                 <div class="flex space-x-6">
-                    <a href="/entries/new" class="hover:text-indigo-200">New Entry</a>
-                    <a href="/entries/" class="hover:text-indigo-200">All Entries</a>
-                    <a href="/meals/" class="hover:text-indigo-200">Meals</a>
-                    <a href="/analysis/" class="hover:text-indigo-200">Analysis</a>
-                    <a href="/advisor/" class="hover:text-indigo-200">Health Advisor</a>
-                    <a href="/sql/" class="hover:text-indigo-200">SQL</a>
-                    <a href="/help" class="hover:text-indigo-200">CLI Help</a>
+                    <a href="/entries/new" class="hover:text-indigo-400 transition-colors">New Entry</a>
+                    <a href="/entries/" class="hover:text-indigo-400 transition-colors">All Entries</a>
+                    <a href="/meals/" class="hover:text-indigo-400 transition-colors">Meals</a>
+                    <a href="/analysis/" class="hover:text-indigo-400 transition-colors">Analysis</a>
+                    <a href="/advisor/" class="hover:text-indigo-400 transition-colors">Health Advisor</a>
+                    <a href="/sql/" class="hover:text-indigo-400 transition-colors">SQL</a>
+                    <a href="/help" class="hover:text-indigo-400 transition-colors">CLI Help</a>
                 </div>
             </div>
         </div>
@@ -52,7 +94,7 @@
     <!-- Flash messages -->
     {% if message %}
     <div class="max-w-7xl mx-auto px-4 mt-4">
-        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+        <div class="bg-green-900/50 border border-green-700 text-green-300 px-4 py-3 rounded">
             {{ message }}
         </div>
     </div>
@@ -64,9 +106,9 @@
     </main>
     
     <!-- Footer -->
-    <footer class="bg-gray-100 border-t mt-12">
-        <div class="max-w-7xl mx-auto px-4 py-6 text-center text-gray-500 text-sm">
-            Daily Health Diary • Your data stays local • <a href="/help" class="text-indigo-600 hover:underline">CLI Commands</a>
+    <footer class="bg-slate-800 border-t border-slate-700 mt-12">
+        <div class="max-w-7xl mx-auto px-4 py-6 text-center text-slate-400 text-sm">
+            Daily Health Diary • Your data stays local • <a href="/help" class="text-indigo-400 hover:underline">CLI Commands</a>
         </div>
     </footer>
     
