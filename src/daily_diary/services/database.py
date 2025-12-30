@@ -770,6 +770,33 @@ class AnalyticsDB:
                 incident.custom_location, incident.description, incident.time_occurred
             ])
         
+        # ===== MEDICATIONS =====
+        self.conn.execute("DELETE FROM medications WHERE entry_date = ?", [entry_date])
+        for med in entry.medications:
+            med_id = str(uuid.uuid4())
+            self.conn.execute("""
+                INSERT INTO medications (
+                    id, entry_date, name, dosage, form, time_taken, purpose, notes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, [
+                med_id, entry_date, med.name, med.dosage,
+                med.form.value if med.form else None,
+                med.time_taken, med.reason, med.notes
+            ])
+        
+        # ===== SUPPLEMENTS =====
+        self.conn.execute("DELETE FROM supplements WHERE entry_date = ?", [entry_date])
+        for supp in entry.supplements:
+            supp_id = str(uuid.uuid4())
+            self.conn.execute("""
+                INSERT INTO supplements (
+                    id, entry_date, name, dosage, time_taken, notes
+                ) VALUES (?, ?, ?, ?, ?, ?)
+            """, [
+                supp_id, entry_date, supp.name, supp.dosage,
+                supp.time_taken, supp.notes
+            ])
+        
         # ===== DAILY SUMMARY =====
         self._update_daily_summary(entry)
     

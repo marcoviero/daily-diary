@@ -42,6 +42,170 @@ async def home(request: Request):
     return RedirectResponse(url="/entries/new", status_code=302)
 
 
+@app.get("/help", response_class=HTMLResponse)
+async def help_page(request: Request):
+    """CLI commands reference page."""
+    return templates.TemplateResponse("help.html", {"request": request})
+
+
+@app.get("/sql/", response_class=HTMLResponse)
+async def sql_explorer(request: Request):
+    """SQL explorer page."""
+    import os
+    from ..services.database import AnalyticsDB
+    from ..utils.config import get_settings
+    
+    settings = get_settings()
+    db_path = settings.data_dir / "analytics.duckdb"
+    wal_path = Path(str(db_path) + ".wal")
+    
+    db_size_mb = os.path.getsize(db_path) / 1024 / 1024 if db_path.exists() else 0
+    wal_size_mb = os.path.getsize(wal_path) / 1024 / 1024 if wal_path.exists() else 0
+    
+    tables = []
+    table_sizes = []
+    
+    try:
+        with AnalyticsDB() as db:
+            # Get table names and row counts
+            tables_df = db.conn.execute("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'main'
+                ORDER BY table_name
+            """).fetchall()
+            
+            for (table_name,) in tables_df:
+                try:
+                    count = db.conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
+                    tables.append({"name": table_name, "rows": count})
+                except:
+                    tables.append({"name": table_name, "rows": "?"})
+            
+            # Estimate table sizes
+            try:
+                sizes_df = db.conn.execute("""
+                    SELECT 
+                        table_name,
+                        estimated_size / 1024.0 as size_kb
+                    FROM duckdb_tables()
+                    ORDER BY estimated_size DESC
+                """).fetchall()
+                for name, size_kb in sizes_df:
+                    table_sizes.append({"name": name, "size_kb": size_kb or 0})
+            except:
+                pass
+                
+    except Exception as e:
+        pass
+    
+    return templates.TemplateResponse("sql.html", {
+        "request": request,
+        "tables": tables,
+        "table_sizes": table_sizes,
+        "db_size_mb": db_size_mb,
+        "wal_size_mb": wal_size_mb,
+        "results": None,
+        "columns": [],
+        "error": None,
+        "last_query": None,
+    })
+
+
+@app.post("/sql/", response_class=HTMLResponse)
+async def sql_query(request: Request):
+    """Execute SQL query."""
+    import os
+    import time
+    from fastapi import Form
+    from ..services.database import AnalyticsDB
+    from ..utils.config import get_settings
+    
+    form_data = await request.form()
+    sql = form_data.get("sql", "").strip()
+    
+    settings = get_settings()
+    db_path = settings.data_dir / "analytics.duckdb"
+    wal_path = Path(str(db_path) + ".wal")
+    
+    db_size_mb = os.path.getsize(db_path) / 1024 / 1024 if db_path.exists() else 0
+    wal_size_mb = os.path.getsize(wal_path) / 1024 / 1024 if wal_path.exists() else 0
+    
+    tables = []
+    table_sizes = []
+    results = None
+    columns = []
+    error = None
+    execution_time = None
+    
+    try:
+        with AnalyticsDB() as db:
+            # Get table info
+            tables_df = db.conn.execute("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'main'
+                ORDER BY table_name
+            """).fetchall()
+            
+            for (table_name,) in tables_df:
+                try:
+                    count = db.conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
+                    tables.append({"name": table_name, "rows": count})
+                except:
+                    tables.append({"name": table_name, "rows": "?"})
+            
+            try:
+                sizes_df = db.conn.execute("""
+                    SELECT 
+                        table_name,
+                        estimated_size / 1024.0 as size_kb
+                    FROM duckdb_tables()
+                    ORDER BY estimated_size DESC
+                """).fetchall()
+                for name, size_kb in sizes_df:
+                    table_sizes.append({"name": name, "size_kb": size_kb or 0})
+            except:
+                pass
+            
+            # Execute query
+            if sql:
+                # Security: only allow SELECT and PRAGMA
+                sql_upper = sql.upper().strip()
+                if not (sql_upper.startswith("SELECT") or 
+                        sql_upper.startswith("PRAGMA") or
+                        sql_upper.startswith("DESCRIBE") or
+                        sql_upper.startswith("SHOW")):
+                    error = "Only SELECT, PRAGMA, DESCRIBE, and SHOW queries are allowed"
+                else:
+                    start = time.time()
+                    result = db.conn.execute(sql)
+                    columns = [desc[0] for desc in result.description] if result.description else []
+                    results = result.fetchall()
+                    execution_time = time.time() - start
+                    
+                    # Limit results to prevent browser crash
+                    if len(results) > 1000:
+                        results = results[:1000]
+                        error = f"Results truncated to 1000 rows (query returned more)"
+                        
+    except Exception as e:
+        error = str(e)
+    
+    return templates.TemplateResponse("sql.html", {
+        "request": request,
+        "tables": tables,
+        "table_sizes": table_sizes,
+        "db_size_mb": db_size_mb,
+        "wal_size_mb": wal_size_mb,
+        "results": results,
+        "columns": columns,
+        "error": error,
+        "last_query": sql,
+        "execution_time": execution_time,
+    })
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""

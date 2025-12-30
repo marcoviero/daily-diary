@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+
+{% block title %}SQL Explorer - Daily Health Diary{% endblock %}
+
+{% block content %}
+<div class="flex gap-6">
+    <!-- Left Sidebar: Tables -->
+    <div class="w-64 flex-shrink-0">
+        <div class="bg-white rounded-xl shadow p-4 sticky top-4">
+            <h2 class="font-semibold text-gray-800 mb-3">📊 Database</h2>
+            
+            <!-- Size Info -->
+            <div class="mb-4 p-3 bg-gray-50 rounded text-sm">
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Total Size:</span>
+                    <span class="font-mono {% if db_size_mb > 50 %}text-red-600 font-bold{% else %}text-gray-800{% endif %}">{{ "%.2f"|format(db_size_mb) }} MB</span>
+                </div>
+                {% if wal_size_mb > 0 %}
+                <div class="flex justify-between">
+                    <span class="text-gray-600">WAL Size:</span>
+                    <span class="font-mono">{{ "%.2f"|format(wal_size_mb) }} MB</span>
+                </div>
+                {% endif %}
+            </div>
+            
+            <h3 class="text-sm font-medium text-gray-600 mb-2">Tables</h3>
+            <div class="space-y-1 text-sm max-h-96 overflow-y-auto">
+                {% for table in tables %}
+                <div class="flex justify-between items-center p-2 hover:bg-gray-50 rounded cursor-pointer group"
+                     onclick="insertTableName('{{ table.name }}')">
+                    <span class="font-mono text-gray-700 group-hover:text-indigo-600">{{ table.name }}</span>
+                    <span class="text-gray-400 text-xs">{{ table.rows }} rows</span>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <!-- Table Sizes -->
+            <h3 class="text-sm font-medium text-gray-600 mt-4 mb-2">Table Sizes (est.)</h3>
+            <div class="space-y-1 text-xs max-h-48 overflow-y-auto">
+                {% for table in table_sizes %}
+                <div class="flex justify-between p-1">
+                    <span class="font-mono text-gray-600">{{ table.name }}</span>
+                    <span class="font-mono {% if table.size_kb > 1000 %}text-red-600 font-bold{% else %}text-gray-500{% endif %}">
+                        {% if table.size_kb >= 1024 %}
+                        {{ "%.1f"|format(table.size_kb / 1024) }} MB
+                        {% else %}
+                        {{ "%.0f"|format(table.size_kb) }} KB
+                        {% endif %}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <!-- Quick Queries -->
+            <h3 class="text-sm font-medium text-gray-600 mt-4 mb-2">Quick Queries</h3>
+            <div class="space-y-1">
+                <button onclick="runQuickQuery('SELECT table_name, estimated_size FROM duckdb_tables() ORDER BY estimated_size DESC')" 
+                        class="w-full text-left text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded">
+                    Table sizes
+                </button>
+                <button onclick="runQuickQuery('SELECT * FROM meals ORDER BY entry_date DESC LIMIT 20')" 
+                        class="w-full text-left text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded">
+                    Recent meals
+                </button>
+                <button onclick="runQuickQuery('SELECT * FROM symptoms ORDER BY entry_date DESC LIMIT 20')" 
+                        class="w-full text-left text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded">
+                    Recent symptoms
+                </button>
+                <button onclick="runQuickQuery('SELECT * FROM medications ORDER BY entry_date DESC LIMIT 20')" 
+                        class="w-full text-left text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded">
+                    Recent medications
+                </button>
+                <button onclick="runQuickQuery('SELECT entry_date, COUNT(*) as meal_count, SUM(calories) as total_cal FROM meals GROUP BY entry_date ORDER BY entry_date DESC')" 
+                        class="w-full text-left text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded">
+                    Daily meal summary
+                </button>
+                <button onclick="runQuickQuery('SELECT column_name, data_type FROM information_schema.columns WHERE table_name = \'meals\'')" 
+                        class="w-full text-left text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded">
+                    Meals schema
+                </button>
+                <button onclick="runQuickQuery('PRAGMA database_size')" 
+                        class="w-full text-left text-xs px-2 py-1 bg-red-100 hover:bg-red-200 rounded text-red-700">
+                    Database size info
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="flex-1">
+        <h1 class="text-2xl font-bold text-gray-800 mb-4">🔍 SQL Explorer</h1>
+        
+        <!-- Query Input -->
+        <div class="bg-white rounded-xl shadow p-4 mb-4">
+            <form id="query-form" onsubmit="executeQuery(event)">
+                <label class="block text-sm font-medium text-gray-700 mb-2">SQL Query</label>
+                <textarea id="sql-input" name="sql" rows="4" 
+                    class="w-full font-mono text-sm border rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="SELECT * FROM meals LIMIT 10">{{ last_query or '' }}</textarea>
+                <div class="flex justify-between items-center mt-3">
+                    <div class="text-xs text-gray-500">
+                        Tip: Click table names to insert. Use LIMIT to avoid large results.
+                    </div>
+                    <div class="space-x-2">
+                        <button type="button" onclick="document.getElementById('sql-input').value=''" 
+                                class="px-3 py-2 text-sm text-gray-600 hover:text-gray-800">
+                            Clear
+                        </button>
+                        <button type="submit" 
+                                class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm">
+                            Run Query
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+        
+        <!-- Results -->
+        <div id="results-container">
+            {% if error %}
+            <div class="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
+                <div class="font-medium text-red-800">Query Error</div>
+                <pre class="text-sm text-red-600 mt-2 whitespace-pre-wrap">{{ error }}</pre>
+            </div>
+            {% endif %}
+            
+            {% if results is not none %}
+            <div class="bg-white rounded-xl shadow p-4">
+                <div class="flex justify-between items-center mb-3">
+                    <span class="text-sm text-gray-600">
+                        {{ results|length }} row{% if results|length != 1 %}s{% endif %} returned
+                        {% if execution_time %}({{ "%.3f"|format(execution_time) }}s){% endif %}
+                    </span>
+                    {% if results %}
+                    <button onclick="copyResults()" class="text-xs text-indigo-600 hover:text-indigo-800">
+                        Copy as CSV
+                    </button>
+                    {% endif %}
+                </div>
+                
+                {% if results %}
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm" id="results-table">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                {% for col in columns %}
+                                <th class="px-3 py-2 text-left font-medium text-gray-600 border-b">{{ col }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y">
+                            {% for row in results %}
+                            <tr class="hover:bg-gray-50">
+                                {% for val in row %}
+                                <td class="px-3 py-2 font-mono text-xs max-w-xs truncate" title="{{ val }}">
+                                    {% if val is none %}
+                                    <span class="text-gray-300 italic">NULL</span>
+                                    {% elif val is string and val|length > 100 %}
+                                    {{ val[:100] }}...
+                                    {% else %}
+                                    {{ val }}
+                                    {% endif %}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-gray-500 text-center py-8">No results</div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function insertTableName(name) {
+    const input = document.getElementById('sql-input');
+    const start = input.selectionStart;
+    const end = input.selectionEnd;
+    const text = input.value;
+    input.value = text.substring(0, start) + name + text.substring(end);
+    input.focus();
+    input.setSelectionRange(start + name.length, start + name.length);
+}
+
+function runQuickQuery(sql) {
+    document.getElementById('sql-input').value = sql;
+    executeQuery();
+}
+
+function executeQuery(event) {
+    if (event) event.preventDefault();
+    const sql = document.getElementById('sql-input').value.trim();
+    if (!sql) return;
+    
+    // Submit via form to get server-side rendering
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/sql/';
+    
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'sql';
+    input.value = sql;
+    
+    form.appendChild(input);
+    document.body.appendChild(form);
+    form.submit();
+}
+
+function copyResults() {
+    const table = document.getElementById('results-table');
+    if (!table) return;
+    
+    let csv = [];
+    const headers = Array.from(table.querySelectorAll('th')).map(th => th.textContent);
+    csv.push(headers.join(','));
+    
+    table.querySelectorAll('tbody tr').forEach(row => {
+        const cells = Array.from(row.querySelectorAll('td')).map(td => {
+            let val = td.getAttribute('title') || td.textContent.trim();
+            if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+                val = '"' + val.replace(/"/g, '""') + '"';
+            }
+            return val;
+        });
+        csv.push(cells.join(','));
+    });
+    
+    navigator.clipboard.writeText(csv.join('\n')).then(() => {
+        alert('Copied to clipboard!');
+    });
+}
+</script>
+{% endblock %}
