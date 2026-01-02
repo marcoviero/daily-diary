@@ -324,7 +324,7 @@ Start by greeting them warmly and asking what brings them in today."""
             context_parts.extend(notes[-5:])
             context_parts.append("")
         
-        # Quick Log factors from DuckDB (cat, caffeine totals, etc.)
+        # Quick Log factors from SQLite (cat, caffeine totals, etc.)
         try:
             from .database import AnalyticsDB
             with AnalyticsDB() as db:
@@ -367,7 +367,7 @@ Start by greeting them warmly and asking what brings them in today."""
                         context_parts.append(" ".join(parts))
                     context_parts.append("")
         except Exception as e:
-            # DuckDB not available or no data - continue without it
+            # SQLite not available or no data - continue without it
             pass
         
         context_parts.append("=== END OF HEALTH DATA ===")

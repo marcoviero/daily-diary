@@ -15,7 +15,7 @@ class DiaryStorage:
     Local storage for diary entries using TinyDB.
     
     Data is stored as JSON in the data directory.
-    Also syncs to DuckDB analytics database for fast queries.
+    Also syncs to SQLite analytics database for fast queries.
     """
     
     def __init__(self, settings: Optional[Settings] = None, sync_analytics: bool = True):
@@ -39,7 +39,7 @@ class DiaryStorage:
     
     @property
     def analytics(self):
-        """Get the DuckDB analytics database."""
+        """Get the SQLite analytics database."""
         if self._analytics_db is None and self._sync_analytics:
             from .database import AnalyticsDB
             self._analytics_db = AnalyticsDB()

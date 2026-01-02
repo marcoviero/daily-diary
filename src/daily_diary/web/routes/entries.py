@@ -85,7 +85,7 @@ def _sync_quick_log_meds(entry, routines_service):
 
 
 def _sync_quick_log_beverages(entry_date, quick_log, routines_service):
-    """Sync caffeine/alcohol quick_log items to meals table in DuckDB."""
+    """Sync caffeine/alcohol quick_log items to meals table in SQLite."""
     from ...services.database import AnalyticsDB
     
     # Calorie estimates for beverages
@@ -227,11 +227,11 @@ async def new_entry_form(
     # Sync caffeine/alcohol from quick_log to meals table (for calories tracking)
     _sync_quick_log_beverages(target_date, entry.quick_log, routines_service)
     
-    # Sync quick_log to DuckDB for analysis (caffeine/alcohol totals + checkbox factors)
+    # Sync quick_log to SQLite for analysis (caffeine/alcohol totals + checkbox factors)
     with AnalyticsDB() as analytics:
         analytics.sync_quick_log(target_date, entry.quick_log, quick_log_totals)
     
-    # Load meals from DuckDB (source of truth for meals) - after syncing beverages
+    # Load meals from SQLite (source of truth for meals) - after syncing beverages
     meals_with_ids = []
     with AnalyticsDB() as analytics:
         import pandas as pd
@@ -274,7 +274,7 @@ async def new_entry_form(
         "mood": previous_entry.mood if previous_entry else None,
     }
     
-    # Save updated integrations and quick_log (but NOT meals - they live in DuckDB)
+    # Save updated integrations and quick_log (but NOT meals - they live in SQLite)
     with get_storage() as storage:
         storage.save_entry(entry)
     
@@ -491,7 +491,7 @@ async def add_meal(
     if contains_alcohol:
         nutrition['alcohol_units'] = alcohol_units or 1.0
     
-    # Save to DuckDB (single source of truth for meals)
+    # Save to SQLite (single source of truth for meals)
     with AnalyticsDB() as analytics:
         analytics.add_meal_with_nutrition(
             entry_date=target_date,
@@ -907,7 +907,7 @@ async def update_quick_log(
             # Calculate updated totals
             totals = routines_service.calculate_totals(entry.quick_log)
         
-        # Sync quick_log to DuckDB for analysis
+        # Sync quick_log to SQLite for analysis
         from ...services.database import AnalyticsDB
         with AnalyticsDB() as analytics:
             analytics.sync_quick_log(target_date, entry.quick_log, totals)
@@ -968,7 +968,7 @@ async def refresh_integrations(request: Request):
             entry.updated_at = datetime.now()
             storage.save_entry(entry)
             
-            # Also sync to DuckDB
+            # Also sync to SQLite
             with AnalyticsDB() as analytics:
                 analytics.upsert_entry(entry)
         

@@ -422,7 +422,7 @@ Return ONLY the JSON object, no other text."""
             "wellbeing_updated": False,
         }
         
-        # Add meals - these go to DuckDB, not JSON
+        # Add meals - these go to SQLite, not JSON
         if parsed_data.get("meals") and entry_date:
             from .database import AnalyticsDB
             from .nutrition import NutritionEstimator

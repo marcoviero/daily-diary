@@ -71,9 +71,9 @@ class AnalysisService:
     - Sleep disruption factors (cat, etc.)
     """
     
-    def __init__(self, storage: Optional[DiaryStorage] = None, use_duckdb: bool = True):
+    def __init__(self, storage: Optional[DiaryStorage] = None, use_db: bool = True):
         self.storage = storage or DiaryStorage()
-        self.use_duckdb = use_duckdb
+        self.use_db = use_db
     
     def build_dataframe(
         self,
@@ -84,7 +84,7 @@ class AnalysisService:
         """
         Build a DataFrame from diary data for analysis.
         
-        Uses DuckDB for comprehensive data if available, falls back to JSON.
+        Uses SQLite for comprehensive data if available, falls back to JSON.
         Each row is a day, columns are features.
         """
         if end_date is None:
@@ -92,8 +92,8 @@ class AnalysisService:
         if start_date is None:
             start_date = end_date - timedelta(days=90)
         
-        # Try DuckDB first for comprehensive data
-        if self.use_duckdb:
+        # Try SQLite first for comprehensive data
+        if self.use_db:
             try:
                 from .database import AnalyticsDB
                 with AnalyticsDB() as db:
@@ -115,7 +115,7 @@ class AnalysisService:
                         
                         return df
             except Exception as e:
-                print(f"DuckDB analysis failed, falling back to JSON: {e}")
+                print(f"SQLite analysis failed, falling back to JSON: {e}")
         
         # Fallback to JSON
         with self.storage as storage:

@@ -54,9 +54,9 @@
             <!-- Quick Queries -->
             <h3 class="text-sm font-medium text-slate-400 mt-4 mb-2">Quick Queries</h3>
             <div class="space-y-1">
-                <button onclick="runQuickQuery('SELECT table_name, estimated_size FROM duckdb_tables() ORDER BY estimated_size DESC')" 
+                <button onclick="runQuickQuery('SELECT name, (SELECT COUNT(*) FROM meals) as rows FROM sqlite_master WHERE type=\'table\' AND name NOT LIKE \'sqlite_%\' ORDER BY name')" 
                         class="w-full text-left text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded">
-                    Table sizes
+                    Table list
                 </button>
                 <button onclick="runQuickQuery('SELECT * FROM meals ORDER BY entry_date DESC LIMIT 20')" 
                         class="w-full text-left text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded">
@@ -74,7 +74,7 @@
                         class="w-full text-left text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded">
                     Daily meal summary
                 </button>
-                <button onclick="runQuickQuery('SELECT column_name, data_type FROM information_schema.columns WHERE table_name = \'meals\'')" 
+                <button onclick="runQuickQuery('PRAGMA table_info(meals)')" 
                         class="w-full text-left text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded">
                     Meals schema
                 </button>

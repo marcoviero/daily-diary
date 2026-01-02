@@ -209,7 +209,7 @@
                 </tr>
                 <tr>
                     <td class="px-4 py-3 font-mono">diary sync-db</td>
-                    <td class="px-4 py-3">Sync all entries to DuckDB</td>
+                    <td class="px-4 py-3">Sync all entries to SQLite</td>
                     <td class="px-4 py-3 text-slate-400 font-mono">diary sync-db</td>
                 </tr>
                 <tr>
@@ -262,7 +262,7 @@
     <div class="bg-slate-800 p-3 rounded font-mono text-sm">
         <p>cd daily-diary</p>
         <p>rm -rf data/entries/      <span class="text-slate-500"># Delete JSON entries</span></p>
-        <p>rm -f data/analytics.duckdb  <span class="text-slate-500"># Delete DuckDB</span></p>
+        <p>rm -f data/analytics.db   <span class="text-slate-500"># Delete SQLite database</span></p>
     </div>
     <p class="text-sm text-red-400 mt-3">App recreates files automatically on next run.</p>
 </div>

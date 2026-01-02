@@ -1,5 +1,5 @@
 -- Daily Diary Analytics Database Schema
--- DuckDB relational database for health tracking analytics
+-- SQLite relational database for health tracking analytics
 -- 
 -- Tables are organized by health domain:
 -- - sleep: Oura Ring sleep data
