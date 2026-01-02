@@ -274,6 +274,11 @@ async def new_entry_form(
         "mood": previous_entry.mood if previous_entry else None,
     }
     
+    # Load vitals for this date
+    vitals = None
+    with AnalyticsDB() as analytics:
+        vitals = analytics.get_vitals(target_date)
+    
     # Save updated integrations and quick_log (but NOT meals - they live in SQLite)
     with get_storage() as storage:
         storage.save_entry(entry)
@@ -292,6 +297,7 @@ async def new_entry_form(
             "routine_categories": routine_categories,
             "quick_log_totals": quick_log_totals,
             "prev_defaults": prev_defaults,
+            "vitals": vitals,
         },
     )
 
@@ -520,6 +526,45 @@ async def delete_meal(
     with AnalyticsDB() as analytics:
         analytics.conn.execute("DELETE FROM meals WHERE id = ?", [meal_id])
         analytics.conn.commit()
+    
+    return RedirectResponse(
+        url=f"/entries/new?entry_date={entry_date}",
+        status_code=303,
+    )
+
+
+@router.post("/vitals")
+async def save_vitals(
+    request: Request,
+    entry_date: str = Form(...),
+    weight_kg: Optional[float] = Form(default=None),
+    body_fat_percent: Optional[float] = Form(default=None),
+    waist_circumference_cm: Optional[float] = Form(default=None),
+    hip_circumference_cm: Optional[float] = Form(default=None),
+    systolic_bp: Optional[int] = Form(default=None),
+    diastolic_bp: Optional[int] = Form(default=None),
+    resting_heart_rate: Optional[int] = Form(default=None),
+    blood_glucose_mgdl: Optional[float] = Form(default=None),
+    vitals_notes: Optional[str] = Form(default=None),
+):
+    """Save vitals for a date."""
+    from ...services.database import AnalyticsDB
+    
+    target_date = datetime.strptime(entry_date, "%Y-%m-%d").date()
+    
+    with AnalyticsDB() as analytics:
+        analytics.save_vitals(
+            entry_date=target_date,
+            weight_kg=weight_kg,
+            body_fat_percent=body_fat_percent,
+            waist_circumference_cm=waist_circumference_cm,
+            hip_circumference_cm=hip_circumference_cm,
+            systolic_bp=systolic_bp,
+            diastolic_bp=diastolic_bp,
+            resting_heart_rate=resting_heart_rate,
+            blood_glucose_mgdl=blood_glucose_mgdl,
+            notes=vitals_notes,
+        )
     
     return RedirectResponse(
         url=f"/entries/new?entry_date={entry_date}",

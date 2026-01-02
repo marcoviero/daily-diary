@@ -135,13 +135,6 @@ class AnalyticsDB:
                 fiber_g REAL,
                 sugar_g REAL,
                 sodium_mg REAL,
-                vitamin_a_iu REAL,
-                vitamin_c_mg REAL,
-                vitamin_d_iu REAL,
-                calcium_mg REAL,
-                iron_mg REAL,
-                potassium_mg REAL,
-                magnesium_mg REAL,
                 water_ml REAL,
                 contains_alcohol INTEGER DEFAULT 0,
                 alcohol_units REAL,
@@ -236,6 +229,8 @@ class AnalyticsDB:
                 weight_kg REAL,
                 body_fat_percent REAL,
                 muscle_mass_kg REAL,
+                waist_circumference_cm REAL,
+                hip_circumference_cm REAL,
                 systolic_bp INTEGER,
                 diastolic_bp INTEGER,
                 resting_heart_rate INTEGER,
@@ -693,6 +688,107 @@ class AnalyticsDB:
         
         self.conn.commit()
         return meal_id
+    
+    def save_vitals(
+        self,
+        entry_date: date,
+        weight_kg: Optional[float] = None,
+        body_fat_percent: Optional[float] = None,
+        waist_circumference_cm: Optional[float] = None,
+        hip_circumference_cm: Optional[float] = None,
+        systolic_bp: Optional[int] = None,
+        diastolic_bp: Optional[int] = None,
+        resting_heart_rate: Optional[int] = None,
+        blood_glucose_mgdl: Optional[float] = None,
+        glucose_timing: Optional[str] = None,
+        notes: Optional[str] = None,
+    ) -> str:
+        """Save or update vitals for a date."""
+        import uuid
+        
+        entry_date_str = entry_date.isoformat()
+        
+        # Check if vitals exist for this date
+        existing = self.conn.execute(
+            "SELECT id FROM vitals WHERE entry_date = ?",
+            [entry_date_str]
+        ).fetchone()
+        
+        if existing:
+            # Update existing record
+            self.conn.execute("""
+                UPDATE vitals SET
+                    weight_kg = COALESCE(?, weight_kg),
+                    body_fat_percent = COALESCE(?, body_fat_percent),
+                    waist_circumference_cm = COALESCE(?, waist_circumference_cm),
+                    hip_circumference_cm = COALESCE(?, hip_circumference_cm),
+                    systolic_bp = COALESCE(?, systolic_bp),
+                    diastolic_bp = COALESCE(?, diastolic_bp),
+                    resting_heart_rate = COALESCE(?, resting_heart_rate),
+                    blood_glucose_mgdl = COALESCE(?, blood_glucose_mgdl),
+                    glucose_timing = COALESCE(?, glucose_timing),
+                    notes = COALESCE(?, notes)
+                WHERE entry_date = ?
+            """, [
+                weight_kg, body_fat_percent, waist_circumference_cm, hip_circumference_cm,
+                systolic_bp, diastolic_bp, resting_heart_rate,
+                blood_glucose_mgdl, glucose_timing, notes, entry_date_str
+            ])
+            vital_id = existing[0]
+        else:
+            # Insert new record
+            vital_id = str(uuid.uuid4())
+            self.conn.execute("""
+                INSERT INTO vitals (
+                    id, entry_date, weight_kg, body_fat_percent,
+                    waist_circumference_cm, hip_circumference_cm,
+                    systolic_bp, diastolic_bp, resting_heart_rate,
+                    blood_glucose_mgdl, glucose_timing, notes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, [
+                vital_id, entry_date_str, weight_kg, body_fat_percent,
+                waist_circumference_cm, hip_circumference_cm,
+                systolic_bp, diastolic_bp, resting_heart_rate,
+                blood_glucose_mgdl, glucose_timing, notes
+            ])
+        
+        self.conn.commit()
+        return vital_id
+    
+    def get_vitals(self, entry_date: date) -> Optional[dict]:
+        """Get vitals for a specific date."""
+        result = self.conn.execute(
+            "SELECT * FROM vitals WHERE entry_date = ?",
+            [entry_date.isoformat()]
+        ).fetchone()
+        
+        if result:
+            return dict(result)
+        return None
+    
+    def get_vitals_history(
+        self,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> pd.DataFrame:
+        """Get vitals history as DataFrame."""
+        query = "SELECT * FROM vitals"
+        conditions = []
+        params = []
+        
+        if start_date:
+            conditions.append("entry_date >= ?")
+            params.append(start_date.isoformat())
+        if end_date:
+            conditions.append("entry_date <= ?")
+            params.append(end_date.isoformat())
+        
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        
+        query += " ORDER BY entry_date DESC"
+        
+        return pd.read_sql(query, self.conn, params=params)
     
     def get_daily_summary_df(
         self,

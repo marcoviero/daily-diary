@@ -814,6 +814,124 @@
     }
     </script>
     
+    <!-- Vitals (collapsible) -->
+    <div class="bg-slate-800 rounded-xl shadow p-4 mb-6">
+        <div class="flex justify-between items-center cursor-pointer" onclick="toggleVitals()">
+            <h2 class="text-lg font-semibold">📏 Vitals</h2>
+            <span id="vitals-toggle" class="text-slate-400 text-xl">{% if vitals %}▼{% else %}▶{% endif %}</span>
+        </div>
+        
+        <div id="vitals-section" class="{% if not vitals %}hidden{% endif %} mt-4">
+            <form action="/entries/vitals" method="post" class="space-y-4">
+                <input type="hidden" name="entry_date" value="{{ entry.entry_date.isoformat() }}">
+                
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <!-- Weight -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-400 mb-1">Weight (kg)</label>
+                        <input type="number" name="weight_kg" step="0.1" min="20" max="300"
+                               value="{{ vitals.weight_kg if vitals and vitals.weight_kg else '' }}"
+                               class="w-full border border-slate-600 rounded px-3 py-2 text-sm"
+                               placeholder="75.5">
+                    </div>
+                    
+                    <!-- Body Fat -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-400 mb-1">Body Fat (%)</label>
+                        <input type="number" name="body_fat_percent" step="0.1" min="3" max="60"
+                               value="{{ vitals.body_fat_percent if vitals and vitals.body_fat_percent else '' }}"
+                               class="w-full border border-slate-600 rounded px-3 py-2 text-sm"
+                               placeholder="20.0">
+                    </div>
+                    
+                    <!-- Waist -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-400 mb-1">Waist (cm)</label>
+                        <input type="number" name="waist_circumference_cm" step="0.5" min="40" max="200"
+                               value="{{ vitals.waist_circumference_cm if vitals and vitals.waist_circumference_cm else '' }}"
+                               class="w-full border border-slate-600 rounded px-3 py-2 text-sm"
+                               placeholder="85.0">
+                    </div>
+                    
+                    <!-- Hip -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-400 mb-1">Hip (cm)</label>
+                        <input type="number" name="hip_circumference_cm" step="0.5" min="50" max="200"
+                               value="{{ vitals.hip_circumference_cm if vitals and vitals.hip_circumference_cm else '' }}"
+                               class="w-full border border-slate-600 rounded px-3 py-2 text-sm"
+                               placeholder="100.0">
+                    </div>
+                    
+                    <!-- Blood Pressure -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-400 mb-1">Systolic BP</label>
+                        <input type="number" name="systolic_bp" min="70" max="250"
+                               value="{{ vitals.systolic_bp if vitals and vitals.systolic_bp else '' }}"
+                               class="w-full border border-slate-600 rounded px-3 py-2 text-sm"
+                               placeholder="120">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-slate-400 mb-1">Diastolic BP</label>
+                        <input type="number" name="diastolic_bp" min="40" max="150"
+                               value="{{ vitals.diastolic_bp if vitals and vitals.diastolic_bp else '' }}"
+                               class="w-full border border-slate-600 rounded px-3 py-2 text-sm"
+                               placeholder="80">
+                    </div>
+                    
+                    <!-- Resting HR -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-400 mb-1">Resting HR</label>
+                        <input type="number" name="resting_heart_rate" min="30" max="200"
+                               value="{{ vitals.resting_heart_rate if vitals and vitals.resting_heart_rate else '' }}"
+                               class="w-full border border-slate-600 rounded px-3 py-2 text-sm"
+                               placeholder="65">
+                    </div>
+                    
+                    <!-- Blood Glucose -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-400 mb-1">Glucose (mg/dL)</label>
+                        <input type="number" name="blood_glucose_mgdl" step="1" min="30" max="600"
+                               value="{{ vitals.blood_glucose_mgdl if vitals and vitals.blood_glucose_mgdl else '' }}"
+                               class="w-full border border-slate-600 rounded px-3 py-2 text-sm"
+                               placeholder="95">
+                    </div>
+                </div>
+                
+                <!-- Notes -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Notes</label>
+                    <input type="text" name="vitals_notes"
+                           value="{{ vitals.notes if vitals and vitals.notes else '' }}"
+                           class="w-full border border-slate-600 rounded px-3 py-2 text-sm"
+                           placeholder="e.g., measured after waking, post-workout, etc.">
+                </div>
+                
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm">
+                    Save Vitals
+                </button>
+                
+                {% if vitals %}
+                <span class="text-sm text-slate-500 ml-2">Last updated: {{ vitals.created_at[:10] if vitals.created_at else 'unknown' }}</span>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+    
+    <script>
+    function toggleVitals() {
+        const section = document.getElementById('vitals-section');
+        const toggle = document.getElementById('vitals-toggle');
+        if (section.classList.contains('hidden')) {
+            section.classList.remove('hidden');
+            toggle.textContent = '▼';
+        } else {
+            section.classList.add('hidden');
+            toggle.textContent = '▶';
+        }
+    }
+    </script>
+    
     <!-- Symptoms & Incidents Side-by-Side -->
     <div class="grid md:grid-cols-2 gap-4 mb-6">
         <!-- Symptoms -->

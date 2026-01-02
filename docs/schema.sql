@@ -138,15 +138,6 @@ CREATE TABLE IF NOT EXISTS meals (
     sugar_g FLOAT,
     sodium_mg FLOAT,
     
-    -- Micronutrients (optional)
-    vitamin_a_iu FLOAT,
-    vitamin_c_mg FLOAT,
-    vitamin_d_iu FLOAT,
-    calcium_mg FLOAT,
-    iron_mg FLOAT,
-    potassium_mg FLOAT,
-    magnesium_mg FLOAT,
-    
     -- Hydration
     water_ml FLOAT,
     
@@ -284,6 +275,10 @@ CREATE TABLE IF NOT EXISTS vitals (
     weight_kg FLOAT,
     body_fat_percent FLOAT,
     muscle_mass_kg FLOAT,
+    
+    -- Body measurements
+    waist_circumference_cm FLOAT,
+    hip_circumference_cm FLOAT,
     
     -- Blood pressure
     systolic_bp INTEGER,
