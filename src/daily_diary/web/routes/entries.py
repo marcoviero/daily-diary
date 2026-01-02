@@ -105,7 +105,7 @@ def _sync_quick_log_beverages(entry_date, quick_log, routines_service):
         analytics.conn.execute("""
             DELETE FROM meals 
             WHERE entry_date = ? AND nutrition_source = 'quick_log'
-        """, [entry_date])
+        """, [entry_date.isoformat()])
         
         # Add beverages based on quick_log counts
         for cat in categories:
@@ -142,15 +142,15 @@ def _sync_quick_log_beverages(entry_date, quick_log, routines_service):
                             nutrition_source
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, [
-                        meal_id, entry_date, 'beverage',
+                        meal_id, entry_date.isoformat(), 'beverage',
                         f"{count}x {name}" if count > 1 else name,
                         calories, protein, carbs, fat,
-                        caffeine_mg, caffeine_mg > 0,
-                        alcohol_units, alcohol_units > 0,
+                        caffeine_mg, 1 if caffeine_mg > 0 else 0,
+                        alcohol_units, 1 if alcohol_units > 0 else 0,
                         'quick_log'
                     ])
         
-        analytics.conn.execute("CHECKPOINT")
+        analytics.conn.commit()
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -236,14 +236,14 @@ async def new_entry_form(
     with AnalyticsDB() as analytics:
         import pandas as pd
         
-        meals_df = analytics.conn.execute("""
+        meals_df = pd.read_sql("""
             SELECT id, meal_type, description, time_consumed, 
                    calories, protein_g, carbs_g, fat_g,
                    contains_caffeine, contains_alcohol, alcohol_units
             FROM meals
             WHERE entry_date = ?
-            ORDER BY nutrition_source ASC, time_consumed ASC NULLS LAST, created_at ASC
-        """, [target_date]).df()
+            ORDER BY nutrition_source ASC, time_consumed ASC, created_at ASC
+        """, analytics.conn, params=[target_date.isoformat()])
         
         if not meals_df.empty:
             entry.meals = []
@@ -519,7 +519,7 @@ async def delete_meal(
     
     with AnalyticsDB() as analytics:
         analytics.conn.execute("DELETE FROM meals WHERE id = ?", [meal_id])
-        analytics.conn.execute("CHECKPOINT")
+        analytics.conn.commit()
     
     return RedirectResponse(
         url=f"/entries/new?entry_date={entry_date}",
@@ -916,6 +916,69 @@ async def update_quick_log(
             "success": True,
             "quick_log": entry.quick_log,
             "totals": totals,
+        })
+        
+    except Exception as e:
+        return JSONResponse(
+            {"success": False, "error": str(e)},
+            status_code=500
+        )
+
+
+@router.post("/api/refresh-integrations")
+async def refresh_integrations(request: Request):
+    """
+    Force refresh of integrations (weather, activities, sleep) for an entry.
+    
+    Optionally pass 'type' in the request body to refresh only one integration:
+    - 'activities': Refresh only Strava activities
+    - 'sleep': Refresh only Oura sleep data
+    - 'weather': Refresh only weather data
+    - (omit type): Refresh all integrations
+    """
+    from ...services.database import AnalyticsDB
+    
+    try:
+        data = await request.json()
+        entry_date_str = data.get('entry_date')
+        refresh_type = data.get('type')  # Optional: 'activities', 'sleep', 'weather', or None for all
+        target_date = datetime.strptime(entry_date_str, "%Y-%m-%d").date()
+        
+        with get_storage() as storage:
+            entry = storage.get_or_create_entry(target_date)
+            
+            # Refresh weather
+            if refresh_type in (None, 'weather'):
+                weather_client = WeatherClient()
+                if weather_client.is_configured:
+                    entry.integrations.weather = weather_client.get_weather_for_date(target_date)
+            
+            # Refresh activities
+            if refresh_type in (None, 'activities'):
+                strava_client = StravaClient()
+                if strava_client.is_configured:
+                    entry.integrations.activities = strava_client.get_activities_for_date(target_date)
+            
+            # Refresh sleep
+            if refresh_type in (None, 'sleep'):
+                oura_client = OuraClient()
+                if oura_client.is_configured:
+                    entry.integrations.sleep = oura_client.get_sleep_for_date(target_date)
+            
+            entry.updated_at = datetime.now()
+            storage.save_entry(entry)
+            
+            # Also sync to DuckDB
+            with AnalyticsDB() as analytics:
+                analytics.upsert_entry(entry)
+        
+        return JSONResponse({
+            "success": True,
+            "refreshed": refresh_type or "all",
+            "has_weather": entry.integrations.weather is not None,
+            "has_activities": bool(entry.integrations.activities),
+            "activity_count": len(entry.integrations.activities) if entry.integrations.activities else 0,
+            "has_sleep": entry.integrations.sleep is not None,
         })
         
     except Exception as e:

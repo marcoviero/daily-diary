@@ -20,12 +20,26 @@
     <!-- Auto-collected data -->
     {% if entry.integrations.weather or entry.integrations.activities or entry.integrations.sleep %}
     <div class="bg-blue-900/30 rounded-xl p-6 mb-6">
-        <h2 class="text-lg font-semibold text-blue-300 mb-4">📡 Auto-collected Data</h2>
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-semibold text-blue-300">📡 Auto-collected Data</h2>
+            <button type="button" onclick="refreshIntegrations()" 
+                    class="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1 px-2 py-1 rounded hover:bg-blue-900/50 transition-colors"
+                    id="refresh-btn">
+                <span id="refresh-icon">🔄</span> Refresh
+            </button>
+        </div>
         <div class="grid md:grid-cols-3 gap-4">
             {% if entry.integrations.weather %}
             <div class="bg-slate-800 rounded-lg shadow-sm cursor-pointer transition-all hover:shadow-md" onclick="toggleDetails(this)">
                 <div class="p-4">
-                    <h3 class="font-medium text-slate-300 mb-2">🌤️ Weather</h3>
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="font-medium text-slate-300">🌤️ Weather</h3>
+                        <button type="button" onclick="event.stopPropagation(); refreshIntegration('weather', this)" 
+                                class="text-slate-400 hover:text-blue-400 p-1 rounded hover:bg-slate-700 transition-colors"
+                                title="Refresh weather data">
+                            <span class="refresh-icon">🔄</span>
+                        </button>
+                    </div>
                     <!-- Summary (always visible) -->
                     <div class="summary">
                         <p class="text-2xl font-bold">{{ entry.integrations.weather.temp_avg_c|round|int }}°C</p>
@@ -78,7 +92,14 @@
             {% if entry.integrations.activities %}
             <div class="bg-slate-800 rounded-lg shadow-sm cursor-pointer transition-all hover:shadow-md" onclick="toggleDetails(this)">
                 <div class="p-4">
-                    <h3 class="font-medium text-slate-300 mb-2">🚴 Activities</h3>
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="font-medium text-slate-300">🚴 Activities</h3>
+                        <button type="button" onclick="event.stopPropagation(); refreshIntegration('activities', this)" 
+                                class="text-slate-400 hover:text-blue-400 p-1 rounded hover:bg-slate-700 transition-colors"
+                                title="Refresh activities from Strava">
+                            <span class="refresh-icon">🔄</span>
+                        </button>
+                    </div>
                     <!-- Summary (always visible) -->
                     <div class="summary">
                         <p class="text-2xl font-bold">{{ entry.integrations.total_activity_minutes|round|int }} min</p>
@@ -126,7 +147,14 @@
             {% if entry.integrations.sleep %}
             <div class="bg-slate-800 rounded-lg shadow-sm cursor-pointer transition-all hover:shadow-md" onclick="toggleDetails(this)">
                 <div class="p-4">
-                    <h3 class="font-medium text-slate-300 mb-2">😴 Sleep</h3>
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="font-medium text-slate-300">😴 Sleep</h3>
+                        <button type="button" onclick="event.stopPropagation(); refreshIntegration('sleep', this)" 
+                                class="text-slate-400 hover:text-blue-400 p-1 rounded hover:bg-slate-700 transition-colors"
+                                title="Refresh sleep data from Oura">
+                            <span class="refresh-icon">🔄</span>
+                        </button>
+                    </div>
                     <!-- Summary (always visible) -->
                     <div class="summary">
                         <p class="text-2xl font-bold">{{ entry.integrations.sleep.sleep_score or 'N/A' }}</p>
@@ -186,6 +214,124 @@
         } else {
             details.classList.add('hidden');
             summary.querySelector('.text-blue-500').textContent = 'Click for details ▼';
+        }
+    }
+    
+    async function refreshIntegration(type, btn) {
+        const icon = btn.querySelector('.refresh-icon');
+        const originalText = icon.textContent;
+        
+        btn.disabled = true;
+        icon.textContent = '⏳';
+        icon.classList.add('animate-pulse');
+        
+        try {
+            const response = await fetch('/entries/api/refresh-integrations', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    entry_date: '{{ entry.entry_date }}',
+                    type: type
+                })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                icon.textContent = '✅';
+                icon.classList.remove('animate-pulse');
+                setTimeout(() => window.location.reload(), 500);
+            } else {
+                icon.textContent = originalText;
+                icon.classList.remove('animate-pulse');
+                btn.disabled = false;
+                alert(`Failed to refresh ${type}`);
+            }
+        } catch (error) {
+            console.error(`Error refreshing ${type}:`, error);
+            icon.textContent = originalText;
+            icon.classList.remove('animate-pulse');
+            btn.disabled = false;
+            alert(`Error refreshing ${type}`);
+        }
+    }
+    
+    async function refreshIntegrations() {
+        const btn = document.getElementById('refresh-btn');
+        const originalText = btn.innerHTML;
+        
+        btn.disabled = true;
+        btn.innerHTML = '<span class="inline-block animate-pulse">⏳</span> Refreshing...';
+        btn.classList.add('opacity-50');
+        
+        try {
+            const response = await fetch('/entries/api/refresh-integrations', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({entry_date: '{{ entry.entry_date }}'})
+            });
+            
+            if (response.ok) {
+                btn.innerHTML = '✅ Done!';
+                setTimeout(() => window.location.reload(), 500);
+            } else {
+                btn.innerHTML = originalText;
+                btn.classList.remove('opacity-50');
+                btn.disabled = false;
+                alert('Failed to refresh integrations');
+            }
+        } catch (error) {
+            console.error('Error refreshing integrations:', error);
+            btn.innerHTML = originalText;
+            btn.classList.remove('opacity-50');
+            btn.disabled = false;
+            alert('Error refreshing integrations');
+        }
+    }
+    </script>
+    {% else %}
+    <!-- No auto-collected data yet - show refresh option -->
+    <div class="bg-blue-900/30 rounded-xl p-6 mb-6">
+        <div class="flex justify-between items-center">
+            <h2 class="text-lg font-semibold text-blue-300">📡 Auto-collected Data</h2>
+            <button type="button" onclick="refreshIntegrations()" 
+                    class="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1 px-2 py-1 rounded hover:bg-blue-900/50 transition-colors"
+                    id="refresh-btn">
+                <span id="refresh-icon">🔄</span> Fetch Data
+            </button>
+        </div>
+        <p class="text-sm text-slate-400 mt-2">No activity, sleep, or weather data yet. Click "Fetch Data" to pull from Strava, Oura, and weather services.</p>
+    </div>
+    <script>
+    async function refreshIntegrations() {
+        const btn = document.getElementById('refresh-btn');
+        const originalText = btn.innerHTML;
+        
+        btn.disabled = true;
+        btn.innerHTML = '<span class="inline-block animate-pulse">⏳</span> Fetching...';
+        btn.classList.add('opacity-50');
+        
+        try {
+            const response = await fetch('/entries/api/refresh-integrations', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({entry_date: '{{ entry.entry_date }}'})
+            });
+            
+            if (response.ok) {
+                btn.innerHTML = '✅ Done!';
+                setTimeout(() => window.location.reload(), 500);
+            } else {
+                btn.innerHTML = originalText;
+                btn.classList.remove('opacity-50');
+                btn.disabled = false;
+                alert('Failed to fetch integrations');
+            }
+        } catch (error) {
+            console.error('Error fetching integrations:', error);
+            btn.innerHTML = originalText;
+            btn.classList.remove('opacity-50');
+            btn.disabled = false;
+            alert('Error fetching integrations');
         }
     }
     </script>

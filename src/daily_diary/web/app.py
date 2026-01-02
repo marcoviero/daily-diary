@@ -56,8 +56,8 @@ async def sql_explorer(request: Request):
     from ..utils.config import get_settings
     
     settings = get_settings()
-    db_path = settings.data_dir / "analytics.duckdb"
-    wal_path = Path(str(db_path) + ".wal")
+    db_path = settings.data_dir / "analytics.db"
+    wal_path = Path(str(db_path) + "-wal")  # SQLite uses -wal
     
     db_size_mb = os.path.getsize(db_path) / 1024 / 1024 if db_path.exists() else 0
     wal_size_mb = os.path.getsize(wal_path) / 1024 / 1024 if wal_path.exists() else 0
@@ -69,10 +69,10 @@ async def sql_explorer(request: Request):
         with AnalyticsDB() as db:
             # Get table names and row counts
             tables_df = db.conn.execute("""
-                SELECT table_name 
-                FROM information_schema.tables 
-                WHERE table_schema = 'main'
-                ORDER BY table_name
+                SELECT name 
+                FROM sqlite_master 
+                WHERE type='table' AND name NOT LIKE 'sqlite_%'
+                ORDER BY name
             """).fetchall()
             
             for (table_name,) in tables_df:
@@ -82,19 +82,8 @@ async def sql_explorer(request: Request):
                 except:
                     tables.append({"name": table_name, "rows": "?"})
             
-            # Estimate table sizes
-            try:
-                sizes_df = db.conn.execute("""
-                    SELECT 
-                        table_name,
-                        estimated_size / 1024.0 as size_kb
-                    FROM duckdb_tables()
-                    ORDER BY estimated_size DESC
-                """).fetchall()
-                for name, size_kb in sizes_df:
-                    table_sizes.append({"name": name, "size_kb": size_kb or 0})
-            except:
-                pass
+            # SQLite doesn't have per-table size info, so just show total
+            # We'll skip table_sizes for now
                 
     except Exception as e:
         pass
@@ -125,8 +114,8 @@ async def sql_query(request: Request):
     sql = form_data.get("sql", "").strip()
     
     settings = get_settings()
-    db_path = settings.data_dir / "analytics.duckdb"
-    wal_path = Path(str(db_path) + ".wal")
+    db_path = settings.data_dir / "analytics.db"
+    wal_path = Path(str(db_path) + "-wal")
     
     db_size_mb = os.path.getsize(db_path) / 1024 / 1024 if db_path.exists() else 0
     wal_size_mb = os.path.getsize(wal_path) / 1024 / 1024 if wal_path.exists() else 0
@@ -142,10 +131,10 @@ async def sql_query(request: Request):
         with AnalyticsDB() as db:
             # Get table info
             tables_df = db.conn.execute("""
-                SELECT table_name 
-                FROM information_schema.tables 
-                WHERE table_schema = 'main'
-                ORDER BY table_name
+                SELECT name 
+                FROM sqlite_master 
+                WHERE type='table' AND name NOT LIKE 'sqlite_%'
+                ORDER BY name
             """).fetchall()
             
             for (table_name,) in tables_df:
@@ -155,28 +144,13 @@ async def sql_query(request: Request):
                 except:
                     tables.append({"name": table_name, "rows": "?"})
             
-            try:
-                sizes_df = db.conn.execute("""
-                    SELECT 
-                        table_name,
-                        estimated_size / 1024.0 as size_kb
-                    FROM duckdb_tables()
-                    ORDER BY estimated_size DESC
-                """).fetchall()
-                for name, size_kb in sizes_df:
-                    table_sizes.append({"name": name, "size_kb": size_kb or 0})
-            except:
-                pass
-            
             # Execute query
             if sql:
                 # Security: only allow SELECT and PRAGMA
                 sql_upper = sql.upper().strip()
                 if not (sql_upper.startswith("SELECT") or 
-                        sql_upper.startswith("PRAGMA") or
-                        sql_upper.startswith("DESCRIBE") or
-                        sql_upper.startswith("SHOW")):
-                    error = "Only SELECT, PRAGMA, DESCRIBE, and SHOW queries are allowed"
+                        sql_upper.startswith("PRAGMA")):
+                    error = "Only SELECT and PRAGMA queries are allowed"
                 else:
                     start = time.time()
                     result = db.conn.execute(sql)

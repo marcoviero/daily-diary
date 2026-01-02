@@ -383,7 +383,7 @@ def sync_db():
                 analytics.upsert_entry(entry)
                 console.print(f"  ✓ {entry.entry_date}")
     
-    console.print(f"\n[green]✓ Synced {len(entries)} entries to analytics.duckdb[/green]")
+    console.print(f"\n[green]✓ Synced {len(entries)} entries to analytics.db[/green]")
 
 
 @app.command()
@@ -730,14 +730,15 @@ def db_compact():
         
         # Size before
         size_before = os.path.getsize(db_path) if db_path.exists() else 0
-        wal_path = Path(str(db_path) + ".wal")
+        wal_path = Path(str(db_path) + "-wal")  # SQLite uses -wal not .wal
+        shm_path = Path(str(db_path) + "-shm")
         wal_before = os.path.getsize(wal_path) if wal_path.exists() else 0
         
         console.print(f"[dim]Before: {(size_before + wal_before) / 1024 / 1024:.2f} MB[/dim]")
         
-        # Checkpoint and vacuum
-        console.print("Running CHECKPOINT...")
-        analytics.conn.execute("CHECKPOINT")
+        # Commit and vacuum
+        console.print("Committing changes...")
+        analytics.conn.commit()
         
         console.print("Running VACUUM...")
         analytics.conn.execute("VACUUM")
@@ -849,7 +850,7 @@ def db_migrate():
                         """, [entry_date, caffeine_mg, alcohol_units])
                         summaries_updated += 1
         
-        analytics.conn.execute("CHECKPOINT")
+        analytics.conn.commit()
         
         console.print(f"\n[green]✓ Migration complete![/green]")
         console.print(f"  Entries processed: {entries_migrated}")

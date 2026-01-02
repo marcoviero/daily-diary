@@ -27,8 +27,10 @@ async def meals_list(
     daily_totals = {}
     
     with AnalyticsDB() as analytics:
+        import pandas as pd
+        
         # Get meals from database
-        meals_df = analytics.conn.execute("""
+        meals_df = pd.read_sql("""
             SELECT 
                 id,
                 entry_date,
@@ -46,7 +48,7 @@ async def meals_list(
             FROM meals
             WHERE entry_date >= ? AND entry_date <= ?
             ORDER BY entry_date DESC, time_consumed ASC
-        """, [start_date, end_date]).df()
+        """, analytics.conn, params=[start_date.isoformat(), end_date.isoformat()])
         
         # Group meals by date
         if not meals_df.empty:
@@ -131,6 +133,6 @@ async def delete_meal(
     """Delete a meal."""
     with AnalyticsDB() as analytics:
         analytics.conn.execute("DELETE FROM meals WHERE id = ?", [meal_id])
-        analytics.conn.execute("CHECKPOINT")
+        analytics.conn.commit()
     
     return RedirectResponse(url="/meals/", status_code=303)
