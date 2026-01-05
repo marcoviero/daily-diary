@@ -304,6 +304,25 @@ CREATE TABLE IF NOT EXISTS vitals (
 );
 
 -- =============================================
+-- MEDITATION TABLE
+-- Daily meditation tracking
+-- =============================================
+CREATE TABLE IF NOT EXISTS meditation (
+    id VARCHAR PRIMARY KEY,
+    entry_date DATE NOT NULL UNIQUE,
+    
+    -- Session info
+    duration_minutes INTEGER,
+    activity_type VARCHAR DEFAULT 'meditation',  -- 'meditation', 'guided', 'breathing', 'yoga_nidra'
+    
+    -- Metadata
+    notes VARCHAR,
+    source VARCHAR DEFAULT 'manual',  -- 'manual', 'csv_import', 'insight_timer'
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =============================================
 -- MEDICATIONS TABLE
 -- Medication tracking
 -- =============================================

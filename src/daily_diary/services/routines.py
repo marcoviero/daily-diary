@@ -29,14 +29,14 @@ class RoutinesService:
             "items": [
                 {"id": "tallboy", "name": "Tall Boy", "description": "16oz beer", "alcohol_units": 1.3, "default_count": 0},
                 {"id": "draft", "name": "Draft Beer", "description": "Pint", "alcohol_units": 1.5, "default_count": 0},
-                {"id": "whisky", "name": "Whisky", "description": "Half shots", "alcohol_units": 0.5, "increment": 0.5, "default_count": 0},
+                {"id": "whisky", "name": "Whisky", "description": "Half shots", "alcohol_units": 0.5, "increment": 1, "default_count": 0},
             ]
         },
         "medicine_supplements": {
             "title": "💊 Medicine/Supplements", 
             "items": [
                 {"id": "fingolimod", "name": "Fingolimod", "dosage": "0.5mg (every other day)", "default_count": 0},
-                {"id": "vitamin_d", "name": "Vitamin D", "dosage": "5000 IU", "default_count": 0},
+                {"id": "vitamin_d", "name": "Vitamin D", "dosage": "5000 IU", "default_count": 1},
                 {"id": "magnesium", "name": "Magnesium", "dosage": "400mg", "default_count": 0},
             ]
         },

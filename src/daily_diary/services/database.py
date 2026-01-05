@@ -304,6 +304,20 @@ class AnalyticsDB:
             )
         """)
         
+        # ===== MEDITATION TABLE =====
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS meditation (
+                id TEXT PRIMARY KEY,
+                entry_date TEXT NOT NULL UNIQUE,
+                duration_minutes INTEGER,
+                activity_type TEXT DEFAULT 'meditation',
+                notes TEXT,
+                source TEXT DEFAULT 'manual',
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
         # ===== INCIDENTS TABLE =====
         self.conn.execute("""
             CREATE TABLE IF NOT EXISTS incidents (
@@ -773,6 +787,87 @@ class AnalyticsDB:
     ) -> pd.DataFrame:
         """Get vitals history as DataFrame."""
         query = "SELECT * FROM vitals"
+        conditions = []
+        params = []
+        
+        if start_date:
+            conditions.append("entry_date >= ?")
+            params.append(start_date.isoformat())
+        if end_date:
+            conditions.append("entry_date <= ?")
+            params.append(end_date.isoformat())
+        
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        
+        query += " ORDER BY entry_date DESC"
+        
+        return pd.read_sql(query, self.conn, params=params)
+    
+    def save_meditation(
+        self,
+        entry_date: date,
+        duration_minutes: Optional[int] = None,
+        activity_type: str = "meditation",
+        notes: Optional[str] = None,
+    ) -> str:
+        """Save or update meditation for a date."""
+        import uuid
+        
+        entry_date_str = entry_date.isoformat()
+        
+        # Check if meditation exists for this date
+        existing = self.conn.execute(
+            "SELECT id FROM meditation WHERE entry_date = ?",
+            [entry_date_str]
+        ).fetchone()
+        
+        if existing:
+            # Update existing record
+            self.conn.execute("""
+                UPDATE meditation SET
+                    duration_minutes = ?,
+                    activity_type = ?,
+                    notes = ?,
+                    updated_at = ?
+                WHERE entry_date = ?
+            """, [
+                duration_minutes, activity_type, notes,
+                datetime.now().isoformat(), entry_date_str
+            ])
+            meditation_id = existing[0]
+        else:
+            # Insert new record
+            meditation_id = str(uuid.uuid4())
+            self.conn.execute("""
+                INSERT INTO meditation (
+                    id, entry_date, duration_minutes, activity_type, notes
+                ) VALUES (?, ?, ?, ?, ?)
+            """, [
+                meditation_id, entry_date_str, duration_minutes, activity_type, notes
+            ])
+        
+        self.conn.commit()
+        return meditation_id
+    
+    def get_meditation(self, entry_date: date) -> Optional[dict]:
+        """Get meditation for a specific date."""
+        result = self.conn.execute(
+            "SELECT * FROM meditation WHERE entry_date = ?",
+            [entry_date.isoformat()]
+        ).fetchone()
+        
+        if result:
+            return dict(result)
+        return None
+    
+    def get_meditation_history(
+        self,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> pd.DataFrame:
+        """Get meditation history as DataFrame."""
+        query = "SELECT * FROM meditation"
         conditions = []
         params = []
         

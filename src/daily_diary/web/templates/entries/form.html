@@ -592,6 +592,14 @@
                             <span class="text-lg font-bold text-indigo-400 w-8">{{ stress_val }}</span>
                         </div>
                         <div class="flex items-center space-x-3">
+                            <label class="text-sm text-slate-400 w-20">🧘 Meditation</label>
+                            <input type="number" name="meditation_minutes" min="0" max="180" 
+                                   value="{{ meditation.duration_minutes if meditation and meditation.duration_minutes else '' }}"
+                                   class="w-20 border border-slate-600 rounded px-2 py-1 text-sm text-center"
+                                   placeholder="0">
+                            <span class="text-sm text-slate-500">minutes</span>
+                        </div>
+                        <div class="flex items-center space-x-3">
                             <textarea name="general_notes" rows="2" 
                                       class="flex-grow border border-slate-600 rounded px-2 py-1 text-sm"
                                       placeholder="Notes...">{{ entry.general_notes or '' }}</textarea>
