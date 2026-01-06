@@ -16,16 +16,42 @@ class NutritionEstimator:
     Tries providers in order: Claude (Anthropic) → OpenAI → Heuristic fallback
     """
     
-    SYSTEM_PROMPT = """You are a nutrition expert assistant. Given a description of a meal or food item, 
-estimate the nutritional content as accurately as possible.
+    SYSTEM_PROMPT = """You are a nutrition expert. Estimate the nutritional content of meals accurately.
 
-Consider:
-- Typical portion sizes unless specified
-- Common preparation methods
-- Regional variations if context is given
-- Include all components mentioned
+CRITICAL RULES:
+1. ITEMIZE FIRST: List every food component separately with its portion and calories BEFORE summing
+2. PORTION MATTERS: A "salad" can be 150-800 cal. A "sandwich" can be 300-900 cal. Think about realistic portions.
+3. NO DEFAULT ESTIMATES: Do not fall back to generic "medium meal" values. Each meal is unique.
+4. SHOW YOUR WORK: Your reasoning must explain each component's contribution
 
-Return a JSON object with these fields (use null if truly unknown):
+WARNING: Do NOT default to ~485 calories. This is a known failure mode.
+Calculate from components FIRST, then sum. If your total happens to be 480-490,
+double-check your component math - you may be anchoring to a default.
+
+PORTION SIZE GUIDELINES:
+- Restaurant portions are typically 1.5-2x home portions
+- "A bowl of" = ~1.5-2 cups
+- "A plate of" = filling a dinner plate
+- Unspecified meat = ~4-6 oz cooked
+- Unspecified pasta = ~2 cups cooked
+- Coffee shop pastry = larger than homemade
+- "Half" of something = literally half the standard size
+
+CALORIE REFERENCE (use these exact values):
+Proteins: egg=70, chicken breast 6oz=280, salmon 6oz=350, ground beef 4oz=290, tofu 4oz=90
+Carbs: bread slice=80, rice 1cup=200, pasta 1cup=220, potato medium=160, banana=105, bagel whole=280
+Fats: butter 1tbsp=100, olive oil 1tbsp=120, avocado half=160, cheese 1oz=110, peanut butter 1tbsp=95
+Drinks: coffee black=5, latte 12oz=190, orange juice 8oz=110, soda 12oz=140
+Common meals: Big Mac=550, Chipotle burrito=1000, slice cheese pizza=285, ramen bowl=450
+
+THINK STEP BY STEP:
+1. What are ALL the components? (Don't forget oils, sauces, sides, drinks)
+2. What's the likely portion of each?
+3. Look up or calculate each component's calories from the reference values
+4. Sum totals
+5. Sanity check: Does this match what you'd expect for this meal type?
+
+Return ONLY this JSON:
 {
     "calories": <number>,
     "protein_g": <number>,
@@ -37,23 +63,14 @@ Return a JSON object with these fields (use null if truly unknown):
     "caffeine_mg": <number or 0>,
     "alcohol_units": <number or 0>,
     "water_ml": <number or 0>,
-    "confidence": <0.0-1.0 how confident you are>,
-    "reasoning": "<brief explanation of your estimate>",
+    "confidence": <0.0-1.0>,
+    "reasoning": "<MUST list each component with portion and calories, then explain total>",
     "components": [
-        {"name": "<item>", "calories": <number>, "amount": "<portion>"}
+        {"name": "<item>", "calories": <number>, "amount": "<specific portion>"}
     ]
 }
 
-Be conservative in estimates. When uncertain, provide a reasonable range in reasoning.
-Common reference points:
-- 1 cup rice = ~200 cal
-- 1 medium banana = ~105 cal  
-- 1 egg = ~70 cal
-- 1 oz cheese = ~100 cal
-- 1 tbsp olive oil = ~120 cal
-- 1 standard drink alcohol = 1 unit
-
-Return ONLY the JSON object, no other text."""
+The "components" array is REQUIRED and must itemize every part of the meal."""
     
     def __init__(self):
         self.settings = get_settings()
@@ -146,7 +163,8 @@ Return ONLY the JSON object, no other text."""
             
             response = self.anthropic_client.messages.create(
                 model="claude-sonnet-4-20250514",
-                max_tokens=500,
+                max_tokens=800,
+                temperature=0.7,
                 messages=[
                     {"role": "user", "content": f"{self.SYSTEM_PROMPT}\n\n{prompt}"}
                 ],
@@ -155,16 +173,39 @@ Return ONLY the JSON object, no other text."""
             # Extract text content
             text = response.content[0].text
             
-            # Parse JSON (handle potential markdown code blocks)
-            if "```json" in text:
-                text = text.split("```json")[1].split("```")[0]
-            elif "```" in text:
-                text = text.split("```")[1].split("```")[0]
+            # Try multiple JSON extraction strategies
+            json_text = None
             
-            result = json.loads(text.strip())
-            result["source"] = "llm"
-            result["model"] = "claude-sonnet-4-20250514"
-            return result
+            # Strategy 1: Look for ```json blocks
+            if "```json" in text:
+                json_text = text.split("```json")[1].split("```")[0]
+            # Strategy 2: Look for any ``` blocks
+            elif "```" in text:
+                json_text = text.split("```")[1].split("```")[0]
+            # Strategy 3: Find JSON object boundaries
+            elif "{" in text and "}" in text:
+                start = text.find("{")
+                end = text.rfind("}") + 1
+                json_text = text[start:end]
+            else:
+                json_text = text
+            
+            try:
+                result = json.loads(json_text.strip())
+                result["source"] = "llm"
+                result["model"] = "claude-sonnet-4-20250514"
+                return result
+            except json.JSONDecodeError as e:
+                # Print what we got for debugging
+                print(f"\n[DEBUG] JSON parse failed at position {e.pos}")
+                print(f"[DEBUG] Error: {e.msg}")
+                print(f"[DEBUG] === RAW RESPONSE START ===")
+                print(text)
+                print(f"[DEBUG] === RAW RESPONSE END ===")
+                print(f"[DEBUG] === EXTRACTED JSON START ===")
+                print(json_text)
+                print(f"[DEBUG] === EXTRACTED JSON END ===\n")
+                return None
             
         except anthropic.APIError as e:
             print(f"[DEBUG] Claude API error: {e}")
@@ -188,8 +229,8 @@ Return ONLY the JSON object, no other text."""
                     {"role": "user", "content": prompt},
                 ],
                 response_format={"type": "json_object"},
-                temperature=0.3,
-                max_tokens=500,
+                temperature=0.7,
+                max_tokens=800,
             )
             
             result = json.loads(response.choices[0].message.content)
@@ -205,66 +246,214 @@ Return ONLY the JSON object, no other text."""
         """
         Basic heuristic-based estimation when LLMs are unavailable.
         
-        Very rough estimates based on keywords.
+        Uses keyword matching for rough estimates.
         """
         description_lower = description.lower()
         
-        # Base estimates
-        calories = 300
-        protein_g = 15
-        carbs_g = 30
-        fat_g = 10
+        # Start with nothing and build up
+        calories = 0
+        protein_g = 0
+        carbs_g = 0
+        fat_g = 0
+        fiber_g = 0
+        components = []
         
-        # Adjust based on keywords
-        if any(word in description_lower for word in ["salad", "vegetables", "veggies"]):
-            calories = 150
-            carbs_g = 15
-            fat_g = 5
-        elif any(word in description_lower for word in ["burger", "pizza", "fried"]):
-            calories = 600
-            fat_g = 25
-            carbs_g = 50
-        elif any(word in description_lower for word in ["steak", "chicken", "fish", "salmon"]):
-            calories = 400
-            protein_g = 35
-            carbs_g = 5
-        elif any(word in description_lower for word in ["pasta", "rice", "noodles"]):
+        # Check for proteins
+        if any(word in description_lower for word in ["chicken", "turkey"]):
+            calories += 250
+            protein_g += 30
+            fat_g += 8
+            components.append("poultry ~250cal")
+        if any(word in description_lower for word in ["beef", "steak", "burger patty"]):
+            calories += 300
+            protein_g += 25
+            fat_g += 20
+            components.append("beef ~300cal")
+        if any(word in description_lower for word in ["salmon", "fish", "tuna"]):
+            calories += 280
+            protein_g += 30
+            fat_g += 12
+            components.append("fish ~280cal")
+        if "egg" in description_lower:
+            count = 2 if "eggs" in description_lower else 1
+            calories += 70 * count
+            protein_g += 6 * count
+            fat_g += 5 * count
+            components.append(f"egg(s) ~{70*count}cal")
+        
+        # Check for soups/stews/chili
+        if any(word in description_lower for word in ["chili", "chilli"]):
+            calories += 400
+            protein_g += 25
+            carbs_g += 30
+            fat_g += 18
+            fiber_g += 8
+            components.append("bowl of chili ~400cal")
+        elif any(word in description_lower for word in ["soup", "stew"]):
+            calories += 250
+            protein_g += 12
+            carbs_g += 25
+            fat_g += 10
+            components.append("bowl of soup/stew ~250cal")
+        
+        # Check for carbs
+        if any(word in description_lower for word in ["rice", "fried rice"]):
+            calories += 200
+            carbs_g += 45
+            components.append("rice ~200cal")
+        if any(word in description_lower for word in ["pasta", "spaghetti", "noodles"]):
+            calories += 220
+            carbs_g += 45
+            components.append("pasta ~220cal")
+        if any(word in description_lower for word in ["bread", "toast"]):
+            calories += 80
+            carbs_g += 15
+            components.append("bread ~80cal")
+        if "bagel" in description_lower:
+            mult = 0.5 if "half" in description_lower else 1.0
+            calories += int(280 * mult)
+            carbs_g += int(55 * mult)
+            components.append(f"bagel ~{int(280*mult)}cal")
+        if any(word in description_lower for word in ["potato", "fries"]):
+            calories += 200
+            carbs_g += 35
+            fat_g += 8
+            components.append("potato/fries ~200cal")
+        
+        # Italian snacks/crackers
+        if "taralli" in description_lower:
+            # ~40 cal each, check for count
+            import re
+            match = re.search(r'(\d+)\s*taralli', description_lower)
+            count = int(match.group(1)) if match else 5
+            calories += 40 * count
+            carbs_g += 5 * count
+            fat_g += 2 * count
+            components.append(f"taralli x{count} ~{40*count}cal")
+        if any(word in description_lower for word in ["crackers", "cracker"]):
+            calories += 120
+            carbs_g += 20
+            fat_g += 4
+            components.append("crackers ~120cal")
+        if any(word in description_lower for word in ["chips", "crisps"]):
+            calories += 150
+            carbs_g += 15
+            fat_g += 10
+            components.append("chips ~150cal")
+        
+        # Check for fats/additions
+        if any(word in description_lower for word in ["peanut butter", "pb"]):
+            tbsp = 2  # assume 2 tbsp
+            calories += 190
+            protein_g += 8
+            fat_g += 16
+            components.append("peanut butter 2tbsp ~190cal")
+        if any(word in description_lower for word in ["butter", "buttered"]):
+            calories += 100
+            fat_g += 11
+            components.append("butter ~100cal")
+        if any(word in description_lower for word in ["cheese", "cheesy"]):
+            calories += 110
+            protein_g += 7
+            fat_g += 9
+            components.append("cheese ~110cal")
+        if "avocado" in description_lower:
+            calories += 160
+            fat_g += 15
+            fiber_g += 5
+            components.append("avocado ~160cal")
+        
+        # Check for vegetables (low cal)
+        if any(word in description_lower for word in ["salad", "vegetables", "veggies", "greens"]):
+            calories += 50
+            carbs_g += 10
+            fiber_g += 3
+            components.append("vegetables ~50cal")
+        
+        # Check for complete meals
+        if any(word in description_lower for word in ["burger", "hamburger"]) and "patty" not in description_lower:
+            calories = 550
+            protein_g = 25
+            carbs_g = 45
+            fat_g = 30
+            components = ["complete burger ~550cal"]
+        if "pizza" in description_lower:
+            slices = 2 if "slices" in description_lower else 1
+            calories = 285 * slices
+            protein_g = 12 * slices
+            carbs_g = 35 * slices
+            fat_g = 10 * slices
+            components = [f"pizza {slices} slice(s) ~{285*slices}cal"]
+        if "burrito" in description_lower:
+            calories = 800
+            protein_g = 30
+            carbs_g = 80
+            fat_g = 35
+            components = ["burrito ~800cal"]
+        if "sandwich" in description_lower:
             calories = 450
-            carbs_g = 60
-        elif any(word in description_lower for word in ["sandwich", "wrap"]):
-            calories = 400
+            protein_g = 20
             carbs_g = 40
-        elif any(word in description_lower for word in ["smoothie", "shake"]):
-            calories = 250
-            carbs_g = 40
-            protein_g = 10
+            fat_g = 22
+            components = ["sandwich ~450cal"]
         
         # Check for drinks
         caffeine_mg = 0
-        if any(word in description_lower for word in ["coffee", "espresso"]):
+        if any(word in description_lower for word in ["coffee", "espresso", "americano"]):
+            if "latte" in description_lower or "cappuccino" in description_lower:
+                calories += 150
+                components.append("latte ~150cal")
+            else:
+                calories += 5
+                components.append("black coffee ~5cal")
             caffeine_mg = 95
         elif "tea" in description_lower:
+            calories += 5
             caffeine_mg = 45
+            components.append("tea ~5cal")
         
         alcohol_units = 0
-        if any(word in description_lower for word in ["beer", "wine", "cocktail", "whiskey", "vodka"]):
+        if any(word in description_lower for word in ["beer"]):
             alcohol_units = 1.5
             calories += 150
+            carbs_g += 13
+            components.append("beer ~150cal")
+        elif any(word in description_lower for word in ["wine"]):
+            alcohol_units = 1.5
+            calories += 125
+            components.append("wine ~125cal")
+        elif any(word in description_lower for word in ["cocktail", "margarita", "martini"]):
+            alcohol_units = 2
+            calories += 200
+            components.append("cocktail ~200cal")
+        elif any(word in description_lower for word in ["whiskey", "vodka", "rum", "gin", "shot"]):
+            alcohol_units = 1
+            calories += 100
+            components.append("spirit ~100cal")
+        
+        # If nothing matched, provide minimal estimate
+        if calories == 0:
+            calories = 200
+            protein_g = 8
+            carbs_g = 25
+            fat_g = 8
+            components = ["unrecognized food ~200cal estimate"]
         
         return {
             "calories": calories,
             "protein_g": protein_g,
             "carbs_g": carbs_g,
             "fat_g": fat_g,
-            "fiber_g": 5,
-            "sugar_g": 10,
-            "sodium_mg": 500,
+            "fiber_g": fiber_g,
+            "sugar_g": int(carbs_g * 0.3),  # rough estimate
+            "sodium_mg": 400 + (calories // 2),  # rough estimate
             "caffeine_mg": caffeine_mg,
             "alcohol_units": alcohol_units,
             "water_ml": 0,
             "confidence": 0.3,
-            "reasoning": "Fallback heuristic estimate - LLM unavailable",
+            "reasoning": f"Heuristic estimate (LLM unavailable). Components: {', '.join(components)}",
             "source": "heuristic",
+            "components": [{"name": c, "calories": 0, "amount": "estimated"} for c in components],
         }
     
     def estimate_batch(self, meals: list[dict]) -> list[dict]:
@@ -285,4 +474,3 @@ Return ONLY the JSON object, no other text."""
             )
             for m in meals
         ]
-

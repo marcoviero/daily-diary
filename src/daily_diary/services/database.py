@@ -501,7 +501,11 @@ class AnalyticsDB:
             ])
         
         # ===== ACTIVITIES =====
-        self.conn.execute("DELETE FROM activities WHERE entry_date = ?", [entry_date])
+        self.conn.execute("""
+                DELETE FROM activities WHERE entry_date = ? AND source != 'manual'
+        """, [
+            entry_date
+        ])
         for activity in entry.integrations.activities or []:
             activity_id = activity.activity_id or str(uuid.uuid4())
             self.conn.execute("""
@@ -884,6 +888,75 @@ class AnalyticsDB:
         query += " ORDER BY entry_date DESC"
         
         return pd.read_sql(query, self.conn, params=params)
+    
+    def save_manual_activity(
+        self,
+        entry_date: date,
+        activity_type: str,
+        duration_minutes: Optional[int] = None,
+        notes: Optional[str] = None,
+    ) -> Optional[str]:
+        """Save or update a manual activity (boxing, weightlifting, etc.) for a date."""
+        import uuid
+
+        if not duration_minutes:
+            # Delete if exists and no duration provided
+            self.conn.execute(
+                "DELETE FROM activities WHERE entry_date = ? AND activity_type = ? AND source = 'manual'",
+                [entry_date.isoformat(), activity_type]
+            )
+            self.conn.commit()
+            return None
+
+        entry_date_str = entry_date.isoformat()
+        
+        # Check if manual activity of this type exists for this date
+        existing = self.conn.execute(
+            "SELECT id FROM activities WHERE entry_date = ? AND activity_type = ? AND source = 'manual'",
+            [entry_date_str, activity_type]
+        ).fetchone()
+        
+        if existing:
+            # Update existing record
+            self.conn.execute("""
+                UPDATE activities SET
+                    duration_minutes = ?,
+                    description = ?,
+                    updated_at = ?
+                WHERE id = ?
+            """, [
+                duration_minutes, notes,
+                datetime.now().isoformat(), existing[0]
+            ])
+            activity_id = existing[0]
+        else:
+            # Insert new record
+            activity_id = str(uuid.uuid4())
+            self.conn.execute("""
+                INSERT INTO activities (
+                    id, entry_date, activity_type, name, duration_minutes, 
+                    description, source
+                ) VALUES (?, ?, ?, ?, ?, ?, 'manual')
+            """, [
+                activity_id, entry_date_str, activity_type, 
+                activity_type.title(), duration_minutes, notes
+            ])
+
+        self.conn.commit()
+        return activity_id
+    
+    def get_manual_activities(self, entry_date: date) -> dict:
+        """Get manual activities for a specific date as a dict keyed by activity_type."""
+        results = self.conn.execute(
+            "SELECT * FROM activities WHERE entry_date = ? AND source = 'manual'",
+            [entry_date.isoformat()]
+        ).fetchall()
+        
+        activities = {}
+        for row in results:
+            row_dict = dict(row)
+            activities[row_dict['activity_type']] = row_dict
+        return activities
     
     def get_daily_summary_df(
         self,

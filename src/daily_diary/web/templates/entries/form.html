@@ -545,27 +545,10 @@
     <!-- Voice Notes & Daily Assessment Combined -->
     <div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
         <div class="grid md:grid-cols-2 gap-6">
-            <!-- Voice Notes -->
-            <div>
-                <div class="flex justify-between items-center mb-3">
-                    <h2 class="text-lg font-semibold text-purple-400">🎤 Voice Notes</h2>
-                    <button type="button" onclick="openRecordingModal()" 
-                            class="bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 text-sm">
-                        Record
-                    </button>
-                </div>
-                <p class="text-sm text-slate-400 mb-2">Record a voice note — it will be transcribed and parsed.</p>
-                {% if entry.general_notes %}
-                <div class="p-3 bg-slate-900 rounded-lg text-sm">
-                    <p class="text-slate-300">{{ entry.general_notes[:200] }}{% if entry.general_notes|length > 200 %}...{% endif %}</p>
-                </div>
-                {% endif %}
-            </div>
-            
             <!-- Daily Assessment -->
             <div>
                 <h2 class="text-lg font-semibold mb-3">📊 Daily Assessment</h2>
-                <form action="/entries/save" method="post">
+                <form action="/entries/save" method="post" id="assessment-form">
                     <input type="hidden" name="entry_date" value="{{ entry.entry_date.isoformat() }}">
                     
                     {% set wellbeing_val = entry.overall_wellbeing or prev_defaults.overall_wellbeing or 5 %}
@@ -592,14 +575,6 @@
                             <span class="text-lg font-bold text-indigo-400 w-8">{{ stress_val }}</span>
                         </div>
                         <div class="flex items-center space-x-3">
-                            <label class="text-sm text-slate-400 w-20">🧘 Meditation</label>
-                            <input type="number" name="meditation_minutes" min="0" max="180" 
-                                   value="{{ meditation.duration_minutes if meditation and meditation.duration_minutes else '' }}"
-                                   class="w-20 border border-slate-600 rounded px-2 py-1 text-sm text-center"
-                                   placeholder="0">
-                            <span class="text-sm text-slate-500">minutes</span>
-                        </div>
-                        <div class="flex items-center space-x-3">
                             <textarea name="general_notes" rows="2" 
                                       class="flex-grow border border-slate-600 rounded px-2 py-1 text-sm"
                                       placeholder="Notes...">{{ entry.general_notes or '' }}</textarea>
@@ -610,6 +585,62 @@
                     </div>
                 </form>
             </div>
+            
+            <!-- Voice Notes -->
+            <div>
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-lg font-semibold text-purple-400">🎤 Voice Notes</h2>
+                    <button type="button" onclick="openRecordingModal()" 
+                            class="bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 text-sm">
+                        Record
+                    </button>
+                </div>
+                <p class="text-sm text-slate-400 mb-2">Record a voice note — it will be transcribed and parsed.</p>
+                {% if entry.general_notes %}
+                <div class="p-3 bg-slate-900 rounded-lg text-sm">
+                    <p class="text-slate-300">{{ entry.general_notes[:200] }}{% if entry.general_notes|length > 200 %}...{% endif %}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Manual Activities (below voice notes) -->
+        <div class="mt-4 pt-4 border-t border-slate-700">
+            <h3 class="text-sm font-medium text-slate-400 mb-3">🏋️ Manual Activity Tracking <span class="text-slate-500">(not captured by Strava)</span></h3>
+            <form action="/entries/activities" method="post" class="flex flex-wrap items-center gap-4">
+                <input type="hidden" name="entry_date" value="{{ entry.entry_date.isoformat() }}">
+                
+                <div class="flex items-center gap-2">
+                    <label class="text-sm text-slate-400">🧘 Meditation</label>
+                    <input type="number" name="meditation_minutes" min="0" max="180" 
+                           value="{{ meditation.duration_minutes if meditation and meditation.duration_minutes else '' }}"
+                           class="w-16 border border-slate-600 rounded px-2 py-1 text-sm text-center"
+                           placeholder="0">
+                    <span class="text-xs text-slate-500">min</span>
+                </div>
+                
+                <div class="flex items-center gap-2">
+                    <label class="text-sm text-slate-400">🥊 Boxing</label>
+                    <input type="number" name="boxing_minutes" min="0" max="180" 
+                           value="{{ manual_activities.boxing.duration_minutes if manual_activities and manual_activities.boxing else '' }}"
+                           class="w-16 border border-slate-600 rounded px-2 py-1 text-sm text-center"
+                           placeholder="0">
+                    <span class="text-xs text-slate-500">min</span>
+                </div>
+                
+                <div class="flex items-center gap-2">
+                    <label class="text-sm text-slate-400">🏋️ Weights</label>
+                    <input type="number" name="weightlifting_minutes" min="0" max="180" 
+                           value="{{ manual_activities.weightlifting.duration_minutes if manual_activities and manual_activities.weightlifting else '' }}"
+                           class="w-16 border border-slate-600 rounded px-2 py-1 text-sm text-center"
+                           placeholder="0">
+                    <span class="text-xs text-slate-500">min</span>
+                </div>
+                
+                <button type="submit" class="bg-slate-700 text-white px-3 py-1 rounded hover:bg-slate-600 text-sm">
+                    Save Activities
+                </button>
+            </form>
         </div>
     </div>
     

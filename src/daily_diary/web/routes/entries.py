@@ -274,12 +274,14 @@ async def new_entry_form(
         "mood": previous_entry.mood if previous_entry else None,
     }
     
-    # Load vitals and meditation for this date
+    # Load vitals, meditation, and manual activities for this date
     vitals = None
     meditation = None
+    manual_activities = {}
     with AnalyticsDB() as analytics:
         vitals = analytics.get_vitals(target_date)
         meditation = analytics.get_meditation(target_date)
+        manual_activities = analytics.get_manual_activities(target_date)
     
     # Save updated integrations and quick_log (but NOT meals - they live in SQLite)
     with get_storage() as storage:
@@ -301,6 +303,7 @@ async def new_entry_form(
             "prev_defaults": prev_defaults,
             "vitals": vitals,
             "meditation": meditation,
+            "manual_activities": manual_activities,
         },
     )
 
@@ -314,11 +317,8 @@ async def save_entry(
     stress_level: Optional[int] = Form(default=None),
     mood: Optional[str] = Form(default=None),
     general_notes: Optional[str] = Form(default=None),
-    meditation_minutes: Optional[int] = Form(default=None),
 ):
     """Save the main entry fields."""
-    from ...services.database import AnalyticsDB
-    
     target_date = datetime.strptime(entry_date, "%Y-%m-%d").date()
     
     with get_storage() as storage:
@@ -333,13 +333,45 @@ async def save_entry(
         
         storage.save_entry(entry)
     
-    # Save meditation if provided
-    if meditation_minutes is not None and meditation_minutes > 0:
-        with AnalyticsDB() as analytics:
-            analytics.save_meditation(
-                entry_date=target_date,
-                duration_minutes=meditation_minutes,
-            )
+    return RedirectResponse(
+        url=f"/entries/new?entry_date={entry_date}",
+        status_code=303,
+    )
+
+
+@router.post("/activities")
+async def save_activities(
+    request: Request,
+    entry_date: str = Form(...),
+    meditation_minutes: Optional[int] = Form(default=None),
+    boxing_minutes: Optional[int] = Form(default=None),
+    weightlifting_minutes: Optional[int] = Form(default=None),
+):
+    """Save manual activities (meditation, boxing, weightlifting)."""
+    from ...services.database import AnalyticsDB
+    
+    target_date = datetime.strptime(entry_date, "%Y-%m-%d").date()
+    
+    with AnalyticsDB() as analytics:
+        # Save meditation
+        analytics.save_meditation(
+            entry_date=target_date,
+            duration_minutes=meditation_minutes if meditation_minutes and meditation_minutes > 0 else None,
+        )
+        
+        # Save boxing
+        analytics.save_manual_activity(
+            entry_date=target_date,
+            activity_type="boxing",
+            duration_minutes=boxing_minutes if boxing_minutes and boxing_minutes > 0 else None,
+        )
+        
+        # Save weightlifting
+        analytics.save_manual_activity(
+            entry_date=target_date,
+            activity_type="weightlifting",
+            duration_minutes=weightlifting_minutes if weightlifting_minutes and weightlifting_minutes > 0 else None,
+        )
     
     return RedirectResponse(
         url=f"/entries/new?entry_date={entry_date}",

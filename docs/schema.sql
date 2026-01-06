@@ -3,7 +3,7 @@
 -- 
 -- Tables are organized by health domain:
 -- - sleep: Oura Ring sleep data
--- - activities: Strava exercise data  
+-- - activities: Exercise data (Strava + manual: boxing, weightlifting)
 -- - meals: Food intake with nutritional estimates
 -- - symptoms: Health symptoms tracking
 -- - incidents: Notable health events
@@ -12,6 +12,7 @@
 -- - medications: Medication tracking
 -- - supplements: Supplement intake
 -- - hydration: Fluid intake
+-- - meditation: Daily meditation tracking
 -- - daily_summary: Aggregated daily metrics
 -- - correlation_cache: Pre-computed correlations
 
@@ -109,7 +110,7 @@ CREATE TABLE IF NOT EXISTS activities (
     wind_speed_kmh FLOAT,
     
     -- Source tracking
-    source VARCHAR DEFAULT 'strava',
+    source VARCHAR DEFAULT 'strava',  -- 'strava', 'manual' (for boxing, weightlifting, etc.)
     external_id VARCHAR,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
