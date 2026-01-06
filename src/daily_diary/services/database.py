@@ -889,6 +889,39 @@ class AnalyticsDB:
         
         return pd.read_sql(query, self.conn, params=params)
     
+    def estimate_calories_burned(
+        self,
+        activity_type: str,
+        duration_minutes: int,
+        body_weight_kg: Optional[float] = None,
+    ) -> float:
+        """
+        Estimate calories burned for manual activities.
+        
+        Uses MET (Metabolic Equivalent of Task) values:
+        - Boxing (sparring/bag work): MET ~7.8
+        - Weightlifting (moderate): MET ~5.0
+        - Meditation: MET ~1.0 (resting)
+        
+        Formula: Calories = MET × weight_kg × duration_hours
+        Default weight: 75kg (~165lbs) if not provided
+        """
+        # MET values for common activities
+        met_values = {
+            'boxing': 7.8,        # Boxing, sparring
+            'weightlifting': 5.0, # Weight lifting, moderate effort
+            'meditation': 1.0,    # Sitting quietly
+            'yoga': 3.0,          # Hatha yoga
+            'stretching': 2.5,    # Stretching, mild
+        }
+        
+        met = met_values.get(activity_type.lower(), 4.0)  # Default MET of 4 for unknown
+        weight = body_weight_kg or 75.0  # Default 75kg
+        duration_hours = duration_minutes / 60.0
+        
+        calories = met * weight * duration_hours
+        return round(calories, 1)
+    
     def save_manual_activity(
         self,
         entry_date: date,
@@ -898,7 +931,9 @@ class AnalyticsDB:
     ) -> Optional[str]:
         """Save or update a manual activity (boxing, weightlifting, etc.) for a date."""
         import uuid
-
+        
+        print(f"[DEBUG DB] save_manual_activity: date={entry_date}, type={activity_type}, duration={duration_minutes}")
+        
         if not duration_minutes:
             # Delete if exists and no duration provided
             self.conn.execute(
@@ -906,9 +941,22 @@ class AnalyticsDB:
                 [entry_date.isoformat(), activity_type]
             )
             self.conn.commit()
+            print(f"[DEBUG DB] Deleted {activity_type} (no duration)")
             return None
-
+        
         entry_date_str = entry_date.isoformat()
+        
+        # Get user's weight from vitals if available (for more accurate calorie estimate)
+        weight_kg = None
+        recent_weight = self.conn.execute(
+            "SELECT weight_kg FROM vitals WHERE weight_kg IS NOT NULL ORDER BY entry_date DESC LIMIT 1"
+        ).fetchone()
+        if recent_weight:
+            weight_kg = recent_weight[0]
+        
+        # Estimate calories burned
+        calories_burned = self.estimate_calories_burned(activity_type, duration_minutes, weight_kg)
+        print(f"[DEBUG DB] Estimated calories: {calories_burned} (weight={weight_kg or 75}kg)")
         
         # Check if manual activity of this type exists for this date
         existing = self.conn.execute(
@@ -921,27 +969,30 @@ class AnalyticsDB:
             self.conn.execute("""
                 UPDATE activities SET
                     duration_minutes = ?,
+                    calories_burned = ?,
                     description = ?,
                     updated_at = ?
                 WHERE id = ?
             """, [
-                duration_minutes, notes,
+                duration_minutes, calories_burned, notes,
                 datetime.now().isoformat(), existing[0]
             ])
             activity_id = existing[0]
+            print(f"[DEBUG DB] Updated {activity_type}: {duration_minutes} min, {calories_burned} cal (id={activity_id})")
         else:
             # Insert new record
             activity_id = str(uuid.uuid4())
             self.conn.execute("""
                 INSERT INTO activities (
                     id, entry_date, activity_type, name, duration_minutes, 
-                    description, source
-                ) VALUES (?, ?, ?, ?, ?, ?, 'manual')
+                    calories_burned, description, source
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'manual')
             """, [
                 activity_id, entry_date_str, activity_type, 
-                activity_type.title(), duration_minutes, notes
+                activity_type.title(), duration_minutes, calories_burned, notes
             ])
-
+            print(f"[DEBUG DB] Inserted {activity_type}: {duration_minutes} min, {calories_burned} cal (id={activity_id})")
+        
         self.conn.commit()
         return activity_id
     
@@ -956,6 +1007,8 @@ class AnalyticsDB:
         for row in results:
             row_dict = dict(row)
             activities[row_dict['activity_type']] = row_dict
+        
+        print(f"[DEBUG DB] get_manual_activities({entry_date}): {list(activities.keys())}")
         return activities
     
     def get_daily_summary_df(

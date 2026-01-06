@@ -626,6 +626,9 @@
                            class="w-16 border border-slate-600 rounded px-2 py-1 text-sm text-center"
                            placeholder="0">
                     <span class="text-xs text-slate-500">min</span>
+                    {% if manual_activities and manual_activities.boxing and manual_activities.boxing.calories_burned %}
+                    <span class="text-xs text-orange-400">🔥 {{ manual_activities.boxing.calories_burned|int }}</span>
+                    {% endif %}
                 </div>
                 
                 <div class="flex items-center gap-2">
@@ -635,11 +638,27 @@
                            class="w-16 border border-slate-600 rounded px-2 py-1 text-sm text-center"
                            placeholder="0">
                     <span class="text-xs text-slate-500">min</span>
+                    {% if manual_activities and manual_activities.weightlifting and manual_activities.weightlifting.calories_burned %}
+                    <span class="text-xs text-orange-400">🔥 {{ manual_activities.weightlifting.calories_burned|int }}</span>
+                    {% endif %}
                 </div>
                 
                 <button type="submit" class="bg-slate-700 text-white px-3 py-1 rounded hover:bg-slate-600 text-sm">
                     Save Activities
                 </button>
+                
+                {% set total_manual_cal = 0 %}
+                {% if manual_activities %}
+                    {% if manual_activities.boxing and manual_activities.boxing.calories_burned %}
+                        {% set total_manual_cal = total_manual_cal + manual_activities.boxing.calories_burned %}
+                    {% endif %}
+                    {% if manual_activities.weightlifting and manual_activities.weightlifting.calories_burned %}
+                        {% set total_manual_cal = total_manual_cal + manual_activities.weightlifting.calories_burned %}
+                    {% endif %}
+                {% endif %}
+                {% if total_manual_cal > 0 %}
+                <span class="text-sm text-orange-400 ml-2">Total: 🔥 {{ total_manual_cal|int }} cal</span>
+                {% endif %}
             </form>
         </div>
     </div>
