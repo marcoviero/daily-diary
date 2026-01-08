@@ -501,11 +501,8 @@ class AnalyticsDB:
             ])
         
         # ===== ACTIVITIES =====
-        self.conn.execute("""
-                DELETE FROM activities WHERE entry_date = ? AND source != 'manual'
-        """, [
-            entry_date
-        ])
+        # Only delete Strava activities, preserve manual ones (boxing, weightlifting, etc.)
+        self.conn.execute("DELETE FROM activities WHERE entry_date = ? AND source != 'manual'", [entry_date])
         for activity in entry.integrations.activities or []:
             activity_id = activity.activity_id or str(uuid.uuid4())
             self.conn.execute("""
@@ -515,8 +512,8 @@ class AnalyticsDB:
                     average_speed_kmh, max_speed_kmh,
                     average_heart_rate, max_heart_rate,
                     average_power_watts, normalized_power_watts,
-                    average_cadence, suffer_score, source, external_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    average_cadence, suffer_score, calories_burned, source, external_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, [
                 activity_id, entry_date, activity.activity_type, activity.name,
                 activity.description, 
@@ -525,7 +522,8 @@ class AnalyticsDB:
                 activity.average_speed_kmh, activity.max_speed_kmh,
                 activity.average_heart_rate, activity.max_heart_rate,
                 activity.average_power_watts, activity.normalized_power_watts,
-                activity.average_cadence, activity.suffer_score, 'strava', activity.activity_id
+                activity.average_cadence, activity.suffer_score, activity.calories_burned,
+                'strava', activity.activity_id
             ])
         
         # ===== WEATHER =====
@@ -705,7 +703,73 @@ class AnalyticsDB:
         ])
         
         self.conn.commit()
+        
+        # Sync meal totals to daily_summary
+        self.sync_meal_totals(entry_date)
+        
         return meal_id
+    
+    def sync_meal_totals(self, entry_date: date) -> None:
+        """Sync meal totals from meals table to daily_summary."""
+        entry_date_str = entry_date.isoformat()
+        
+        # Calculate totals from meals table
+        totals = self.conn.execute("""
+            SELECT 
+                COUNT(*) as meal_count,
+                COALESCE(SUM(calories), 0) as total_calories,
+                COALESCE(SUM(protein_g), 0) as total_protein_g,
+                COALESCE(SUM(carbs_g), 0) as total_carbs_g,
+                COALESCE(SUM(fat_g), 0) as total_fat_g,
+                COALESCE(SUM(fiber_g), 0) as total_fiber_g,
+                COALESCE(SUM(caffeine_mg), 0) as total_caffeine_mg,
+                COALESCE(SUM(alcohol_units), 0) as total_alcohol_units,
+                COALESCE(SUM(water_ml), 0) as total_water_ml
+            FROM meals
+            WHERE entry_date = ?
+        """, [entry_date_str]).fetchone()
+        
+        # Get existing row data to preserve non-meal fields
+        existing = self.conn.execute(
+            "SELECT * FROM daily_summary WHERE entry_date = ? LIMIT 1", 
+            [entry_date_str]
+        ).fetchone()
+        
+        if existing:
+            # Update existing - only meal-related fields
+            self.conn.execute("""
+                UPDATE daily_summary SET
+                    meal_count = ?,
+                    total_calories = ?,
+                    total_protein_g = ?,
+                    total_carbs_g = ?,
+                    total_fat_g = ?,
+                    total_fiber_g = ?,
+                    total_caffeine_mg = ?,
+                    total_alcohol_units = ?,
+                    total_water_ml = ?,
+                    updated_at = ?
+                WHERE entry_date = ?
+            """, [
+                totals[0], totals[1], totals[2], totals[3], totals[4],
+                totals[5], totals[6], totals[7], totals[8],
+                datetime.now().isoformat(), entry_date_str
+            ])
+        else:
+            # Insert new row with just meal data
+            self.conn.execute("""
+                INSERT INTO daily_summary (
+                    entry_date, meal_count, total_calories, total_protein_g,
+                    total_carbs_g, total_fat_g, total_fiber_g,
+                    total_caffeine_mg, total_alcohol_units, total_water_ml, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, [
+                entry_date_str, totals[0], totals[1], totals[2], totals[3],
+                totals[4], totals[5], totals[6], totals[7], totals[8],
+                datetime.now().isoformat()
+            ])
+        
+        self.conn.commit()
     
     def save_vitals(
         self,

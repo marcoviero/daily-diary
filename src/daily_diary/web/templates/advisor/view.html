@@ -134,12 +134,24 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     try {
-        const conversation = JSON.parse('{{ consultation.conversation_json | safe }}');
+        // Parse the conversation JSON safely
+        const rawJson = {{ consultation.conversation_json | tojson }};
+        const conversation = JSON.parse(rawJson);
         const container = document.getElementById('conversation-container');
+        
+        if (!conversation || conversation.length === 0) {
+            container.innerHTML = '<p class="text-slate-400">No conversation recorded.</p>';
+            return;
+        }
         
         conversation.forEach(msg => {
             const div = document.createElement('div');
             const isUser = msg.role === 'user';
+            
+            // Skip the "[Started consultation]" opener
+            if (isUser && msg.content === '[Started consultation]') {
+                return;
+            }
             
             div.className = `flex ${isUser ? 'justify-end' : 'justify-start'}`;
             
@@ -148,8 +160,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 ? 'bg-teal-600 text-white px-4 py-3 rounded-lg max-w-2xl'
                 : 'bg-slate-700 text-slate-200 px-4 py-3 rounded-lg max-w-2xl';
             
-            // Format content
+            // Format content - escape HTML first, then apply formatting
             let content = msg.content
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                 .replace(/\n\n/g, '</p><p class="mt-2">')
                 .replace(/\n/g, '<br>');
@@ -160,6 +175,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     } catch (e) {
         console.error('Error parsing conversation:', e);
+        document.getElementById('conversation-container').innerHTML = 
+            '<p class="text-red-400">Error loading conversation.</p>';
     }
 });
 </script>

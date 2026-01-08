@@ -196,40 +196,19 @@ Start by greeting them warmly and asking what brings them in today."""
                 )
             context_parts.append("")
         
-        # Activities
-        activity_data = []
-        for entry in entries:
-            for activity in entry.integrations.activities or []:
-                activity_data.append({
-                    "date": entry.entry_date.isoformat(),
-                    "type": activity.activity_type,
-                    "name": activity.name,
-                    "duration": activity.duration_minutes,
-                    "hr_avg": activity.average_heart_rate,
-                })
-        
-        if activity_data:
-            context_parts.append("--- ACTIVITIES (Last 14) ---")
-            for a in activity_data[-14:]:
-                parts = [f"  {a['date']}: {a['name'] or a['type']}"]
-                if a['duration']:
-                    parts.append(f"{a['duration']:.0f}min")
-                if a['hr_avg']:
-                    parts.append(f"HR {a['hr_avg']:.0f}")
-                context_parts.append(", ".join(parts))
-            context_parts.append("")
+        # Note: Activities are now loaded from SQLite below (includes both Strava and manual)
         
         # Meals with potential triggers
         trigger_meals = []
         for entry in entries:
             for meal in entry.meals:
-                if meal.contains_alcohol or meal.contains_caffeine or meal.trigger_foods:
+                if meal.contains_alcohol or meal.contains_caffeine or meal.contains_common_triggers:
                     trigger_meals.append({
                         "date": entry.entry_date.isoformat(),
                         "meal": meal.description[:50],
                         "alcohol": meal.alcohol_units if meal.contains_alcohol else 0,
                         "caffeine": meal.contains_caffeine,
-                        "triggers": meal.trigger_foods,
+                        "triggers": meal.contains_common_triggers,
                     })
         
         if trigger_meals:
@@ -324,16 +303,116 @@ Start by greeting them warmly and asking what brings them in today."""
             context_parts.extend(notes[-5:])
             context_parts.append("")
         
-        # Quick Log factors from SQLite (cat, caffeine totals, etc.)
+        # SQLite data: meals, vitals, and quick log factors
         try:
             from .database import AnalyticsDB
+            import pandas as pd
+            
             with AnalyticsDB() as db:
-                factors_df = db.conn.execute("""
+                # Get meals from SQLite
+                meals_df = pd.read_sql("""
+                    SELECT entry_date, meal_type, description, calories, 
+                           protein_g, carbs_g, fat_g, caffeine_mg, alcohol_units
+                    FROM meals
+                    WHERE entry_date >= ? AND entry_date <= ?
+                    ORDER BY entry_date DESC, time_consumed
+                """, db.conn, params=[start_date, end_date])
+                
+                if not meals_df.empty:
+                    context_parts.append("--- MEALS (Last 14 days) ---")
+                    # Group by date
+                    for entry_dt in meals_df['entry_date'].unique()[:14]:
+                        day_meals = meals_df[meals_df['entry_date'] == entry_dt]
+                        context_parts.append(f"  {entry_dt}:")
+                        for _, meal in day_meals.iterrows():
+                            parts = [f"    {meal['meal_type']}: {meal['description'][:60]}"]
+                            if meal['calories']:
+                                parts.append(f"({int(meal['calories'])} cal)")
+                            if meal['caffeine_mg'] and meal['caffeine_mg'] > 0:
+                                parts.append(f"☕{int(meal['caffeine_mg'])}mg")
+                            if meal['alcohol_units'] and meal['alcohol_units'] > 0:
+                                parts.append(f"🍺{meal['alcohol_units']:.1f}u")
+                            context_parts.append(" ".join(parts))
+                    context_parts.append("")
+                
+                # Get vitals from SQLite
+                vitals_df = pd.read_sql("""
+                    SELECT entry_date, weight_kg, body_fat_percent, 
+                           waist_circumference_cm, hip_circumference_cm,
+                           systolic_bp, diastolic_bp, resting_heart_rate,
+                           blood_glucose_mgdl
+                    FROM vitals
+                    WHERE entry_date >= ? AND entry_date <= ?
+                    ORDER BY entry_date DESC
+                """, db.conn, params=[start_date, end_date])
+                
+                if not vitals_df.empty:
+                    context_parts.append("--- VITALS ---")
+                    for _, row in vitals_df.head(14).iterrows():
+                        parts = [f"  {row['entry_date']}:"]
+                        if pd.notna(row['weight_kg']):
+                            parts.append(f"Weight {row['weight_kg']:.1f}kg")
+                        if pd.notna(row['body_fat_percent']):
+                            parts.append(f"BF {row['body_fat_percent']:.1f}%")
+                        if pd.notna(row['waist_circumference_cm']):
+                            parts.append(f"Waist {row['waist_circumference_cm']:.0f}cm")
+                        if pd.notna(row['systolic_bp']) and pd.notna(row['diastolic_bp']):
+                            parts.append(f"BP {int(row['systolic_bp'])}/{int(row['diastolic_bp'])}")
+                        if pd.notna(row['resting_heart_rate']):
+                            parts.append(f"RHR {int(row['resting_heart_rate'])}")
+                        if pd.notna(row['blood_glucose_mgdl']):
+                            parts.append(f"Glucose {int(row['blood_glucose_mgdl'])}")
+                        if len(parts) > 1:  # Has data beyond just the date
+                            context_parts.append(" ".join(parts))
+                    context_parts.append("")
+                
+                # Get ALL activities from SQLite (Strava + manual)
+                all_activities_df = pd.read_sql("""
+                    SELECT entry_date, name, activity_type, duration_minutes, 
+                           calories_burned, average_heart_rate, source
+                    FROM activities
+                    WHERE entry_date >= ? AND entry_date <= ?
+                    ORDER BY entry_date DESC, start_time DESC
+                """, db.conn, params=[start_date, end_date])
+                
+                if not all_activities_df.empty:
+                    context_parts.append("--- ACTIVITIES ---")
+                    for _, row in all_activities_df.head(20).iterrows():
+                        name = row['name'] or row['activity_type'].title()
+                        parts = [f"  {row['entry_date']}: {name[:45]}"]
+                        if pd.notna(row['duration_minutes']) and row['duration_minutes']:
+                            parts.append(f"{int(row['duration_minutes'])}min")
+                        if pd.notna(row['calories_burned']) and row['calories_burned']:
+                            parts.append(f"🔥{int(row['calories_burned'])}cal")
+                        if pd.notna(row['average_heart_rate']) and row['average_heart_rate']:
+                            parts.append(f"HR {int(row['average_heart_rate'])}")
+                        if row['source'] == 'manual':
+                            parts.append("(manual)")
+                        context_parts.append(" ".join(parts))
+                    context_parts.append("")
+                
+                # Get meditation
+                meditation_df = pd.read_sql("""
+                    SELECT entry_date, duration_minutes
+                    FROM meditation
+                    WHERE entry_date >= ? AND entry_date <= ?
+                      AND duration_minutes > 0
+                    ORDER BY entry_date DESC
+                """, db.conn, params=[start_date, end_date])
+                
+                if not meditation_df.empty:
+                    context_parts.append("--- MEDITATION ---")
+                    for _, row in meditation_df.head(14).iterrows():
+                        context_parts.append(f"  {row['entry_date']}: {int(row['duration_minutes'])}min")
+                    context_parts.append("")
+                
+                # Quick Log factors
+                factors_df = pd.read_sql("""
                     SELECT entry_date, cat_in_room, cat_woke_me
                     FROM daily_factors
                     WHERE entry_date >= ? AND entry_date <= ?
                     ORDER BY entry_date DESC
-                """, [start_date, end_date]).df()
+                """, db.conn, params=[start_date, end_date])
                 
                 if not factors_df.empty:
                     context_parts.append("--- SLEEP DISRUPTION FACTORS ---")
@@ -347,17 +426,17 @@ Start by greeting them warmly and asking what brings them in today."""
                             context_parts.append(f"  {row['entry_date']}: {', '.join(flags)}")
                     context_parts.append("")
                 
-                # Also get caffeine/alcohol totals from daily_summary
-                totals_df = db.conn.execute("""
+                # Caffeine/alcohol totals from daily_summary
+                totals_df = pd.read_sql("""
                     SELECT entry_date, total_caffeine_mg, total_alcohol_units
                     FROM daily_summary
                     WHERE entry_date >= ? AND entry_date <= ?
                       AND (total_caffeine_mg > 0 OR total_alcohol_units > 0)
                     ORDER BY entry_date DESC
-                """, [start_date, end_date]).df()
+                """, db.conn, params=[start_date, end_date])
                 
                 if not totals_df.empty:
-                    context_parts.append("--- CAFFEINE & ALCOHOL (from Quick Log) ---")
+                    context_parts.append("--- CAFFEINE & ALCOHOL TOTALS ---")
                     for _, row in totals_df.head(14).iterrows():
                         parts = [f"  {row['entry_date']}:"]
                         if row['total_caffeine_mg'] and row['total_caffeine_mg'] > 0:
@@ -368,6 +447,7 @@ Start by greeting them warmly and asking what brings them in today."""
                     context_parts.append("")
         except Exception as e:
             # SQLite not available or no data - continue without it
+            print(f"[DEBUG] Advisor SQLite error: {e}")
             pass
         
         context_parts.append("=== END OF HEALTH DATA ===")
@@ -394,14 +474,28 @@ Start by greeting them warmly and asking what brings them in today."""
         # Build and store system prompt with context
         self._system_prompt_with_context = f"{self.SYSTEM_PROMPT}\n\n{self._health_context}"
         
+        # Initial prompt to get greeting
+        initial_prompt = "Please greet me and ask what brings me in today. Briefly mention that you've reviewed my recent health data."
+        
         # Get initial greeting
         response, provider = self._get_response(
             self._system_prompt_with_context,
-            "Please greet me and ask what brings me in today. Briefly mention that you've reviewed my recent health data.",
+            initial_prompt,
             is_first_message=True
         )
         
         self._provider_used = provider
+        
+        # Add to conversation history with a cleaner opener
+        # (API requires user message first, but we use a simple opener for the transcript)
+        self._conversation_history.append({
+            "role": "user",
+            "content": "[Started consultation]"
+        })
+        self._conversation_history.append({
+            "role": "assistant", 
+            "content": response
+        })
         
         return response, provider
     
@@ -476,6 +570,8 @@ Start by greeting them warmly and asking what brings them in today."""
                 messages = [{"role": "user", "content": user_message}]
             else:
                 messages = self._conversation_history.copy()
+                # Add the new user message
+                messages.append({"role": "user", "content": user_message})
             
             response = self.anthropic_client.messages.create(
                 model="claude-sonnet-4-20250514",
@@ -510,6 +606,8 @@ Start by greeting them warmly and asking what brings them in today."""
                 messages.append({"role": "user", "content": user_message})
             else:
                 messages.extend(self._conversation_history)
+                # Add the new user message
+                messages.append({"role": "user", "content": user_message})
             
             response = self.openai_client.chat.completions.create(
                 model="gpt-4o",
@@ -603,11 +701,15 @@ Start by greeting them warmly and asking what brings them in today."""
 
 Return ONLY the JSON object, no other text. If a field doesn't apply, use null."""
 
+        print(f"[DEBUG] Generating summary with {len(self._conversation_history)} messages in history")
+        
         # Add summary request to get response
         response, _ = self._get_response(
             self._system_prompt_with_context,
             summary_prompt,
         )
+        
+        print(f"[DEBUG] Summary response length: {len(response) if response else 0}")
         
         # Parse JSON response
         try:
@@ -620,9 +722,12 @@ Return ONLY the JSON object, no other text. If a field doesn't apply, use null."
             elif "```" in text:
                 text = text.split("```")[1].split("```")[0]
             
-            return json.loads(text.strip())
+            result = json.loads(text.strip())
+            print(f"[DEBUG] Summary parsed successfully")
+            return result
         except Exception as e:
             print(f"Error parsing summary: {e}")
+            print(f"[DEBUG] Raw response was: {response[:500] if response else 'None'}...")
             # Return basic summary if parsing fails
             return {
                 "summary": "Consultation completed. Summary generation failed.",

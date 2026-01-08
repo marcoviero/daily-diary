@@ -53,6 +53,7 @@ class ActivityData(BaseModel):
     max_heart_rate: Optional[float] = None
     average_power_watts: Optional[float] = None
     normalized_power_watts: Optional[float] = None
+    calories_burned: Optional[float] = None
     
     # Cycling-specific
     average_cadence: Optional[float] = None

@@ -151,6 +151,8 @@ def _sync_quick_log_beverages(entry_date, quick_log, routines_service):
                     ])
         
         analytics.conn.commit()
+        # Sync meal totals after updating beverages
+        analytics.sync_meal_totals(entry_date)
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -350,28 +352,41 @@ async def save_activities(
     """Save manual activities (meditation, boxing, weightlifting)."""
     from ...services.database import AnalyticsDB
     
+    print(f"[DEBUG] save_activities called: date={entry_date}, meditation={meditation_minutes}, boxing={boxing_minutes}, weights={weightlifting_minutes}")
+    
     target_date = datetime.strptime(entry_date, "%Y-%m-%d").date()
     
     with AnalyticsDB() as analytics:
         # Save meditation
-        analytics.save_meditation(
-            entry_date=target_date,
-            duration_minutes=meditation_minutes if meditation_minutes and meditation_minutes > 0 else None,
-        )
+        if meditation_minutes is not None and meditation_minutes > 0:
+            analytics.save_meditation(
+                entry_date=target_date,
+                duration_minutes=meditation_minutes,
+            )
+        elif meditation_minutes == 0 or meditation_minutes is None:
+            # Clear meditation if set to 0 or empty
+            analytics.save_meditation(
+                entry_date=target_date,
+                duration_minutes=None,
+            )
         
         # Save boxing
-        analytics.save_manual_activity(
-            entry_date=target_date,
-            activity_type="boxing",
-            duration_minutes=boxing_minutes if boxing_minutes and boxing_minutes > 0 else None,
-        )
+        if boxing_minutes and boxing_minutes > 0:
+            print(f"[DEBUG] Saving boxing: {boxing_minutes} minutes")
+            analytics.save_manual_activity(
+                entry_date=target_date,
+                activity_type="boxing",
+                duration_minutes=boxing_minutes,
+            )
         
         # Save weightlifting
-        analytics.save_manual_activity(
-            entry_date=target_date,
-            activity_type="weightlifting",
-            duration_minutes=weightlifting_minutes if weightlifting_minutes and weightlifting_minutes > 0 else None,
-        )
+        if weightlifting_minutes and weightlifting_minutes > 0:
+            print(f"[DEBUG] Saving weightlifting: {weightlifting_minutes} minutes")
+            analytics.save_manual_activity(
+                entry_date=target_date,
+                activity_type="weightlifting",
+                duration_minutes=weightlifting_minutes,
+            )
     
     return RedirectResponse(
         url=f"/entries/new?entry_date={entry_date}",
@@ -569,9 +584,13 @@ async def delete_meal(
     """Delete a meal."""
     from ...services.database import AnalyticsDB
     
+    target_date = datetime.strptime(entry_date, "%Y-%m-%d").date()
+    
     with AnalyticsDB() as analytics:
         analytics.conn.execute("DELETE FROM meals WHERE id = ?", [meal_id])
         analytics.conn.commit()
+        # Sync meal totals after deletion
+        analytics.sync_meal_totals(target_date)
     
     return RedirectResponse(
         url=f"/entries/new?entry_date={entry_date}",

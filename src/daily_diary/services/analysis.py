@@ -513,23 +513,23 @@ class AnalysisService:
         try:
             with AnalyticsDB() as db:
                 # Get all medications
-                meds_df = db.conn.execute("""
+                meds_df = pd.read_sql("""
                     SELECT 
                         entry_date,
                         name,
                         dosage,
                         time_taken,
-                        reason
+                        purpose as reason
                     FROM medications
                     WHERE entry_date >= ? AND entry_date <= ?
                     ORDER BY entry_date, time_taken
-                """, [start_date, end_date]).df()
+                """, db.conn, params=[start_date, end_date])
                 
                 if meds_df.empty:
                     return []
                 
                 # Get all symptoms (focus on headaches)
-                symptoms_df = db.conn.execute("""
+                symptoms_df = pd.read_sql("""
                     SELECT 
                         entry_date,
                         symptom_type,
@@ -538,14 +538,14 @@ class AnalysisService:
                     FROM symptoms
                     WHERE entry_date >= ? AND entry_date <= ?
                     ORDER BY entry_date, onset_time
-                """, [start_date, end_date]).df()
+                """, db.conn, params=[start_date, end_date])
                 
                 # Get all dates in range for baseline comparison
-                all_dates_df = db.conn.execute("""
+                all_dates_df = pd.read_sql("""
                     SELECT DISTINCT entry_date 
                     FROM daily_summary
                     WHERE entry_date >= ? AND entry_date <= ?
-                """, [start_date, end_date]).df()
+                """, db.conn, params=[start_date, end_date])
                 
                 all_dates = set(all_dates_df['entry_date'].tolist()) if not all_dates_df.empty else set()
                 

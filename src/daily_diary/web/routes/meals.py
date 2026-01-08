@@ -131,8 +131,20 @@ async def delete_meal(
     meal_id: str = Form(...),
 ):
     """Delete a meal."""
+    from datetime import datetime
+    
     with AnalyticsDB() as analytics:
-        analytics.conn.execute("DELETE FROM meals WHERE id = ?", [meal_id])
-        analytics.conn.commit()
+        # Get entry_date before deleting
+        result = analytics.conn.execute(
+            "SELECT entry_date FROM meals WHERE id = ?", [meal_id]
+        ).fetchone()
+        
+        if result:
+            entry_date_str = result[0]
+            analytics.conn.execute("DELETE FROM meals WHERE id = ?", [meal_id])
+            analytics.conn.commit()
+            # Sync meal totals after deletion
+            target_date = datetime.strptime(entry_date_str, "%Y-%m-%d").date()
+            analytics.sync_meal_totals(target_date)
     
     return RedirectResponse(url="/meals/", status_code=303)

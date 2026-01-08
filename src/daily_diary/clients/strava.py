@@ -92,13 +92,42 @@ class StravaClient:
             response.raise_for_status()
             activities_data = response.json()
             
-            return [self._parse_activity(a) for a in activities_data]
+            # Fetch detailed data for each activity to get calories
+            results = []
+            for summary in activities_data:
+                detailed = self._get_activity_detail(summary.get("id"))
+                if detailed:
+                    results.append(self._parse_activity(detailed))
+                else:
+                    results.append(self._parse_activity(summary))
+            return results
         except httpx.HTTPError as e:
             print(f"Strava API error: {e}")
             return []
     
-    def get_recent_activities(self, days: int = 7) -> list[ActivityData]:
-        """Fetch activities from the last N days."""
+    def _get_activity_detail(self, activity_id: int) -> Optional[dict]:
+        """Fetch detailed activity data to get calories."""
+        if not activity_id:
+            return None
+        try:
+            response = self.client.get(
+                f"{self.API_URL}/activities/{activity_id}",
+                headers=self._get_headers(),
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPError as e:
+            print(f"Strava detail fetch error for {activity_id}: {e}")
+            return None
+    
+    def get_recent_activities(self, days: int = 7, fetch_details: bool = True) -> list[ActivityData]:
+        """Fetch activities from the last N days.
+        
+        Args:
+            days: Number of days to look back
+            fetch_details: If True, fetch detailed data for each activity to get calories.
+                          This makes an extra API call per activity but gets accurate calorie data.
+        """
         if not self.is_configured or not self._ensure_valid_token():
             return []
         
@@ -116,13 +145,36 @@ class StravaClient:
             response.raise_for_status()
             activities_data = response.json()
             
-            return [self._parse_activity(a) for a in activities_data]
+            if fetch_details:
+                # Fetch detailed data for each activity to get calories
+                results = []
+                for i, summary in enumerate(activities_data):
+                    print(f"  Fetching details for activity {i+1}/{len(activities_data)}...")
+                    detailed = self._get_activity_detail(summary.get("id"))
+                    if detailed:
+                        results.append(self._parse_activity(detailed))
+                    else:
+                        results.append(self._parse_activity(summary))
+                return results
+            else:
+                return [self._parse_activity(a) for a in activities_data]
         except httpx.HTTPError as e:
             print(f"Strava API error: {e}")
             return []
     
     def _parse_activity(self, data: dict) -> ActivityData:
         """Parse Strava API response into ActivityData model."""
+        # Strava provides kilojoules for power-based activities
+        # and calories for estimated calorie burn
+        # kilojoules ≈ calories for cycling (due to ~25% human efficiency)
+        calories = None
+        if data.get("kilojoules"):
+            # For activities with power data, kilojoules ≈ kcal
+            calories = data.get("kilojoules")
+        elif data.get("calories"):
+            # Some activities have direct calorie estimate
+            calories = data.get("calories")
+        
         return ActivityData(
             activity_id=str(data.get("id")),
             activity_type=data.get("type", "Unknown"),
@@ -137,6 +189,7 @@ class StravaClient:
             average_power_watts=data.get("average_watts"),
             average_cadence=data.get("average_cadence"),
             suffer_score=data.get("suffer_score"),
+            calories_burned=calories,
             start_time=datetime.fromisoformat(data["start_date_local"].replace("Z", "+00:00")) if data.get("start_date_local") else None,
             description=data.get("description"),
         )
