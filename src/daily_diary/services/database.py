@@ -1140,26 +1140,48 @@ class AnalyticsDB:
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
     ) -> pd.DataFrame:
-        """Get comprehensive daily data for correlation analysis."""
+        """Get comprehensive daily data for correlation analysis.
+        
+        Returns one row per date with aggregated data.
+        """
+        # Use a subquery to ensure we get only one row per date
+        # This handles any duplicate rows in daily_summary
         query = """
             SELECT 
-                ds.*,
+                ds.entry_date,
+                ds.overall_wellbeing,
+                ds.energy_level,
+                ds.stress_level,
+                ds.mood,
+                ds.sleep_score,
+                ds.total_sleep_minutes,
+                ds.sleep_efficiency,
+                ds.hrv_average,
+                ds.activity_count,
+                ds.total_activity_minutes,
+                ds.total_distance_km,
+                ds.total_elevation_m,
+                ds.meal_count,
+                ds.total_alcohol_units,
+                ds.symptom_count,
+                ds.worst_symptom_severity,
+                ds.has_headache,
+                ds.has_neuralgiaform,
+                ds.incident_count,
+                ds.temp_avg_c,
+                ds.pressure_hpa,
+                ds.humidity_percent,
+                ds.total_calories,
+                ds.total_caffeine_mg,
                 df.cat_in_room,
-                df.cat_woke_me,
-                COALESCE(n.total_calories, 0) as nutrition_calories,
-                COALESCE(n.total_protein_g, 0) as nutrition_protein_g,
-                COALESCE(n.meal_caffeine_mg, 0) as meal_caffeine_mg
-            FROM daily_summary ds
-            LEFT JOIN daily_factors df ON ds.entry_date = df.entry_date
-            LEFT JOIN (
-                SELECT 
-                    entry_date,
-                    SUM(calories) as total_calories,
-                    SUM(protein_g) as total_protein_g,
-                    SUM(caffeine_mg) as meal_caffeine_mg
-                FROM meals
+                df.cat_woke_me
+            FROM (
+                SELECT entry_date, MAX(rowid) as latest_rowid
+                FROM daily_summary
                 GROUP BY entry_date
-            ) n ON ds.entry_date = n.entry_date
+            ) latest
+            JOIN daily_summary ds ON ds.entry_date = latest.entry_date AND ds.rowid = latest.latest_rowid
+            LEFT JOIN daily_factors df ON ds.entry_date = df.entry_date
         """
         conditions = []
         params = []

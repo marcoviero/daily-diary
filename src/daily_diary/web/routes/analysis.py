@@ -28,13 +28,22 @@ async def analysis_dashboard(
     # Get all analysis data
     summary = service.get_summary_stats(start_date, end_date)
     correlations = service.analyze_symptom_correlations(
-        target='worst_symptom_severity',
+        target='has_headache',  # Use binary column for clearer results
         start_date=start_date,
         end_date=end_date,
     )
     patterns = service.find_symptom_patterns(start_date, end_date)
     chart_data = service.generate_chart_data(start_date, end_date)
     medication_analysis = service.analyze_medication_effectiveness(start_date, end_date)
+    
+    # New: Lag correlations and actionable insights
+    lag_correlations = service.analyze_lag_correlations(
+        target='has_headache',
+        start_date=start_date,
+        end_date=end_date,
+        max_lag_days=3,
+    )
+    actionable_insights = service.get_actionable_insights(start_date, end_date)
     
     # Filter to significant correlations for display
     significant_correlations = [c for c in correlations if c.is_significant]
@@ -50,6 +59,8 @@ async def analysis_dashboard(
             "patterns": patterns,
             "chart_data": chart_data,
             "medication_analysis": medication_analysis,
+            "lag_correlations": lag_correlations,
+            "actionable_insights": actionable_insights,
         },
     )
 

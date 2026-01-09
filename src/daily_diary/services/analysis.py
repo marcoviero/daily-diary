@@ -432,16 +432,47 @@ class AnalysisService:
         if df.empty:
             return {'error': 'No data available'}
         
+        # Count unique dates (not rows, in case of duplicates)
+        unique_dates = df.index.nunique() if hasattr(df.index, 'nunique') else len(df)
+        
+        # Calculate symptom rate using available columns
+        # has_headache is 1/0, symptom_count is the count, has_symptoms from JSON
+        if 'has_headache' in df.columns:
+            days_with_symptoms = int(df['has_headache'].sum())
+            symptom_rate = float(df['has_headache'].mean())
+        elif 'has_symptoms' in df.columns:
+            days_with_symptoms = int(df['has_symptoms'].sum())
+            symptom_rate = float(df['has_symptoms'].mean())
+        elif 'symptom_count' in df.columns:
+            days_with_symptoms = int((df['symptom_count'] > 0).sum())
+            symptom_rate = float((df['symptom_count'] > 0).mean())
+        else:
+            days_with_symptoms = 0
+            symptom_rate = 0
+        
+        # Only calculate means for non-null values
+        avg_wellbeing = None
+        if 'overall_wellbeing' in df.columns:
+            valid = df['overall_wellbeing'].dropna()
+            if len(valid) > 0:
+                avg_wellbeing = float(valid.mean())
+        
+        avg_sleep_score = None
+        if 'sleep_score' in df.columns:
+            valid = df['sleep_score'].dropna()
+            if len(valid) > 0:
+                avg_sleep_score = float(valid.mean())
+        
         stats_dict = {
-            'period_days': len(df),
-            'start_date': df.index.min().strftime('%Y-%m-%d'),
-            'end_date': df.index.max().strftime('%Y-%m-%d'),
-            'days_with_symptoms': int(df['has_symptoms'].sum()) if 'has_symptoms' in df.columns else 0,
-            'symptom_rate': float(df['has_symptoms'].mean()) if 'has_symptoms' in df.columns else 0,
-            'avg_wellbeing': float(df['overall_wellbeing'].mean()) if 'overall_wellbeing' in df.columns and df['overall_wellbeing'].notna().any() else None,
-            'avg_sleep_score': float(df['sleep_score'].mean()) if 'sleep_score' in df.columns and df['sleep_score'].notna().any() else None,
+            'period_days': unique_dates,
+            'start_date': df.index.min().strftime('%Y-%m-%d') if len(df) > 0 else None,
+            'end_date': df.index.max().strftime('%Y-%m-%d') if len(df) > 0 else None,
+            'days_with_symptoms': days_with_symptoms,
+            'symptom_rate': symptom_rate,
+            'avg_wellbeing': avg_wellbeing,
+            'avg_sleep_score': avg_sleep_score,
             'total_activity_hours': float(df['total_activity_minutes'].sum() / 60) if 'total_activity_minutes' in df.columns else 0,
-            'total_elevation_m': float(df['elevation_gain'].sum()) if 'elevation_gain' in df.columns else 0,
+            'total_elevation_m': float(df['total_elevation_m'].sum()) if 'total_elevation_m' in df.columns else 0,
         }
         
         return stats_dict
@@ -459,12 +490,31 @@ class AnalysisService:
         
         charts = {}
         
-        # Time series of symptom severity
+        # Time series of symptom severity and wellbeing
+        # Use None for missing values instead of 0 so charts can skip them
+        severity_col = None
         if 'worst_symptom_severity' in df.columns:
+            severity_col = 'worst_symptom_severity'
+        elif 'has_headache' in df.columns:
+            severity_col = 'has_headache'
+        
+        if severity_col:
+            # Convert to list, replacing NaN with None for JSON
+            severity_data = df[severity_col].where(pd.notna(df[severity_col]), None).tolist()
+            
+            wellbeing_data = []
+            if 'overall_wellbeing' in df.columns:
+                wellbeing_data = df['overall_wellbeing'].where(pd.notna(df['overall_wellbeing']), None).tolist()
+            
+            sleep_score_data = []
+            if 'sleep_score' in df.columns:
+                sleep_score_data = df['sleep_score'].where(pd.notna(df['sleep_score']), None).tolist()
+            
             charts['symptom_timeline'] = {
                 'dates': df.index.strftime('%Y-%m-%d').tolist(),
-                'severity': df['worst_symptom_severity'].fillna(0).tolist(),
-                'wellbeing': df['overall_wellbeing'].fillna(0).tolist() if 'overall_wellbeing' in df.columns else [],
+                'severity': severity_data,
+                'wellbeing': wellbeing_data,
+                'sleep_score': sleep_score_data,
             }
         
         # Pressure vs symptoms scatter
@@ -633,3 +683,309 @@ class AnalysisService:
             print(f"Medication analysis error: {e}")
         
         return results
+    
+    def analyze_lag_correlations(
+        self,
+        target: str = 'has_headache',
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        max_lag_days: int = 3,
+    ) -> list[dict]:
+        """
+        Analyze correlations with time delays.
+        
+        Useful for understanding delayed effects like:
+        - Medication effects (may take 1-2 days)
+        - Exercise benefits (next-day effects)
+        - Sleep debt accumulation
+        - Dietary impacts
+        
+        Returns list of factors with their optimal lag and correlation strength.
+        """
+        df = self.build_dataframe(start_date, end_date)
+        
+        if df.empty or target not in df.columns:
+            return []
+        
+        # Factors to analyze with lags
+        factors = [
+            ('total_activity_minutes', 'Exercise Duration'),
+            ('total_elevation_m', 'Elevation Gain'),
+            ('sleep_score', 'Sleep Score'),
+            ('total_sleep_minutes', 'Sleep Duration'),
+            ('total_caffeine_mg', 'Caffeine Intake'),
+            ('total_alcohol_units', 'Alcohol Units'),
+            ('pressure_hpa', 'Barometric Pressure'),
+            ('overall_wellbeing', 'Wellbeing Score'),
+            ('total_calories', 'Calorie Intake'),
+        ]
+        
+        results = []
+        
+        for col, name in factors:
+            if col not in df.columns:
+                continue
+            
+            best_lag = 0
+            best_r = 0
+            best_p = 1.0
+            best_n = 0
+            lag_results = []
+            
+            # Test each lag (0 = same day, 1 = previous day, etc.)
+            for lag in range(max_lag_days + 1):
+                if lag == 0:
+                    shifted = df[col]
+                else:
+                    shifted = df[col].shift(lag)
+                
+                # Get paired data
+                mask = shifted.notna() & df[target].notna()
+                x = shifted[mask]
+                y = df.loc[mask, target]
+                
+                if len(x) < 10:  # Need enough samples
+                    continue
+                
+                try:
+                    r, p = stats.pearsonr(x, y)
+                    lag_results.append({
+                        'lag': lag,
+                        'r': r,
+                        'p': p,
+                        'n': len(x)
+                    })
+                    
+                    # Track strongest significant correlation
+                    if p < 0.1 and abs(r) > abs(best_r):  # Use p < 0.1 for detection
+                        best_lag = lag
+                        best_r = r
+                        best_p = p
+                        best_n = len(x)
+                except:
+                    continue
+            
+            if best_n >= 10 and best_p < 0.1:
+                lag_desc = {
+                    0: 'same day',
+                    1: 'previous day',
+                    2: '2 days prior',
+                    3: '3 days prior'
+                }
+                
+                interpretation = self._interpret_lag_correlation(name, best_r, best_p, best_lag, target)
+                
+                results.append({
+                    'factor': name,
+                    'optimal_lag': best_lag,
+                    'lag_description': lag_desc.get(best_lag, f'{best_lag} days prior'),
+                    'correlation': round(best_r, 3),
+                    'p_value': round(best_p, 4),
+                    'n_samples': best_n,
+                    'is_significant': best_p < 0.05,
+                    'strength': self._get_strength(best_r),
+                    'interpretation': interpretation,
+                    'all_lags': lag_results,
+                })
+        
+        # Sort by significance then strength
+        results.sort(key=lambda x: (-int(x['is_significant']), -abs(x['correlation'])))
+        
+        return results
+    
+    def _get_strength(self, r: float) -> str:
+        """Get correlation strength description."""
+        r = abs(r)
+        if r < 0.1:
+            return "negligible"
+        elif r < 0.3:
+            return "weak"
+        elif r < 0.5:
+            return "moderate"
+        elif r < 0.7:
+            return "strong"
+        else:
+            return "very strong"
+    
+    def _interpret_lag_correlation(
+        self,
+        factor: str,
+        r: float,
+        p: float,
+        lag: int,
+        target: str
+    ) -> str:
+        """Generate interpretation for lag correlation."""
+        if p >= 0.1:
+            return f"No clear delayed relationship found."
+        
+        strength = self._get_strength(r)
+        
+        if lag == 0:
+            timing = "on the same day"
+        elif lag == 1:
+            timing = "the following day"
+        else:
+            timing = f"{lag} days later"
+        
+        if "sleep" in factor.lower():
+            if r < 0:
+                return f"Better sleep is associated with fewer symptoms {timing} ({strength} effect)."
+            else:
+                return f"Sleep patterns show a relationship with symptoms {timing}."
+        elif "exercise" in factor.lower() or "activity" in factor.lower():
+            if r < 0:
+                return f"More activity appears to reduce symptoms {timing} ({strength} effect)."
+            else:
+                return f"Higher activity levels correlate with symptoms {timing}. Consider if this reflects overexertion."
+        elif "caffeine" in factor.lower():
+            if r > 0:
+                return f"Higher caffeine intake is associated with more symptoms {timing}. Consider reducing intake."
+            else:
+                return f"Caffeine shows a {strength} protective relationship {timing}."
+        elif "alcohol" in factor.lower():
+            if r > 0:
+                return f"Alcohol consumption correlates with worse symptoms {timing}."
+            else:
+                return f"Alcohol shows unexpected negative correlation {timing}."
+        elif "pressure" in factor.lower():
+            if r < 0:
+                return f"Lower pressure is associated with worse symptoms {timing}. You may be weather-sensitive."
+            else:
+                return f"Higher pressure correlates with symptoms {timing}."
+        elif "wellbeing" in factor.lower():
+            return f"Wellbeing shows a {strength} {'' if r < 0 else 'inverse '}correlation with symptoms {timing}."
+        else:
+            return f"{factor} shows a {strength} {'protective' if r < 0 else 'risk'} correlation {timing}."
+    
+    def get_actionable_insights(
+        self,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> list[dict]:
+        """
+        Generate actionable health insights based on the data.
+        
+        Returns prioritized list of insights with specific recommendations.
+        """
+        df = self.build_dataframe(start_date, end_date)
+        
+        if df.empty:
+            return []
+        
+        insights = []
+        
+        # Determine symptom column
+        symptom_col = 'has_headache' if 'has_headache' in df.columns else 'has_symptoms' if 'has_symptoms' in df.columns else None
+        
+        if not symptom_col:
+            return []
+        
+        # 1. Sleep quality impact
+        if 'sleep_score' in df.columns:
+            low_sleep = df[df['sleep_score'] < 70]
+            high_sleep = df[df['sleep_score'] >= 70]
+            
+            if len(low_sleep) >= 5 and len(high_sleep) >= 5:
+                low_sleep_symptom_rate = low_sleep[symptom_col].mean()
+                high_sleep_symptom_rate = high_sleep[symptom_col].mean()
+                
+                if low_sleep_symptom_rate > high_sleep_symptom_rate * 1.3:  # 30% higher
+                    diff = (low_sleep_symptom_rate - high_sleep_symptom_rate) * 100
+                    insights.append({
+                        'category': 'Sleep',
+                        'priority': 'high',
+                        'insight': f'Poor sleep nights (<70 score) have {diff:.0f}% more symptom days',
+                        'recommendation': 'Focus on sleep hygiene. Consider consistent bedtime, limiting screens before bed, and avoiding late caffeine.',
+                        'data_quality': 'good' if len(low_sleep) >= 10 else 'limited',
+                    })
+        
+        # 2. Weekend patterns
+        if 'is_weekend' in df.columns:
+            weekend = df[df['is_weekend'] == True]
+            weekday = df[df['is_weekend'] == False]
+            
+            if len(weekend) >= 5 and len(weekday) >= 10:
+                weekend_rate = weekend[symptom_col].mean()
+                weekday_rate = weekday[symptom_col].mean()
+                
+                if abs(weekend_rate - weekday_rate) > 0.15:  # 15% difference
+                    if weekend_rate > weekday_rate:
+                        insights.append({
+                            'category': 'Lifestyle',
+                            'priority': 'medium',
+                            'insight': f'Weekend symptom rate is higher ({weekend_rate*100:.0f}% vs {weekday_rate*100:.0f}%)',
+                            'recommendation': 'Weekend triggers might include sleep schedule changes, alcohol, or different activities. Try maintaining consistent routines.',
+                            'data_quality': 'good',
+                        })
+                    else:
+                        insights.append({
+                            'category': 'Lifestyle',
+                            'priority': 'medium',
+                            'insight': f'Weekday symptom rate is higher ({weekday_rate*100:.0f}% vs {weekend_rate*100:.0f}%)',
+                            'recommendation': 'Work stress, screen time, or weekday habits may be contributing. Consider stress management techniques.',
+                            'data_quality': 'good',
+                        })
+        
+        # 3. Caffeine impact (with lag)
+        if 'total_caffeine_mg' in df.columns:
+            df['caffeine_prev'] = df['total_caffeine_mg'].shift(1)
+            high_caffeine = df[df['caffeine_prev'] > 200]  # >200mg previous day
+            low_caffeine = df[df['caffeine_prev'] <= 200]
+            
+            if len(high_caffeine) >= 5 and len(low_caffeine) >= 5:
+                high_rate = high_caffeine[symptom_col].mean()
+                low_rate = low_caffeine[symptom_col].mean()
+                
+                if high_rate > low_rate * 1.2:
+                    insights.append({
+                        'category': 'Diet',
+                        'priority': 'medium',
+                        'insight': f'High caffeine days (>200mg) are followed by more symptoms',
+                        'recommendation': 'Consider limiting caffeine, especially after noon. Gradual reduction prevents withdrawal headaches.',
+                        'data_quality': 'good' if len(high_caffeine) >= 10 else 'limited',
+                    })
+        
+        # 4. Exercise benefits
+        if 'total_activity_minutes' in df.columns:
+            active = df[df['total_activity_minutes'] >= 30]
+            inactive = df[df['total_activity_minutes'] < 30]
+            
+            if len(active) >= 5 and len(inactive) >= 5:
+                active_rate = active[symptom_col].mean()
+                inactive_rate = inactive[symptom_col].mean()
+                
+                if inactive_rate > active_rate * 1.2:
+                    insights.append({
+                        'category': 'Exercise',
+                        'priority': 'medium',
+                        'insight': f'Days with 30+ min activity have fewer symptoms',
+                        'recommendation': 'Regular moderate exercise may help prevent symptoms. Even walking counts!',
+                        'data_quality': 'good' if len(active) >= 10 else 'limited',
+                    })
+        
+        # 5. Weather sensitivity
+        if 'pressure_hpa' in df.columns:
+            valid_pressure = df[df['pressure_hpa'].notna()]
+            if len(valid_pressure) >= 20:
+                low_p = valid_pressure[valid_pressure['pressure_hpa'] < valid_pressure['pressure_hpa'].quantile(0.25)]
+                high_p = valid_pressure[valid_pressure['pressure_hpa'] > valid_pressure['pressure_hpa'].quantile(0.75)]
+                
+                if len(low_p) >= 5 and len(high_p) >= 5:
+                    low_p_rate = low_p[symptom_col].mean()
+                    high_p_rate = high_p[symptom_col].mean()
+                    
+                    if low_p_rate > high_p_rate * 1.3:
+                        insights.append({
+                            'category': 'Weather',
+                            'priority': 'low',
+                            'insight': f'Low pressure days show more symptoms ({low_p_rate*100:.0f}% vs {high_p_rate*100:.0f}%)',
+                            'recommendation': 'You may be weather-sensitive. Consider preemptive measures when storms approach.',
+                            'data_quality': 'good',
+                        })
+        
+        # Sort by priority
+        priority_order = {'high': 0, 'medium': 1, 'low': 2}
+        insights.sort(key=lambda x: priority_order.get(x['priority'], 3))
+        
+        return insights
