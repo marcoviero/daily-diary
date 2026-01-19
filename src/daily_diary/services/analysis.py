@@ -98,7 +98,7 @@ class AnalysisService:
                 from .database import AnalyticsDB
                 with AnalyticsDB() as db:
                     df = db.get_analysis_data(start_date, end_date)
-                    if not df.empty and len(df) >= min_days:
+                    if not df.empty:
                         df['date'] = pd.to_datetime(df['entry_date'])
                         df = df.set_index('date').sort_index()
                         
@@ -435,20 +435,22 @@ class AnalysisService:
         # Count unique dates (not rows, in case of duplicates)
         unique_dates = df.index.nunique() if hasattr(df.index, 'nunique') else len(df)
         
-        # Calculate symptom rate using available columns
-        # has_headache is 1/0, symptom_count is the count, has_symptoms from JSON
-        if 'has_headache' in df.columns:
-            days_with_symptoms = int(df['has_headache'].sum())
-            symptom_rate = float(df['has_headache'].mean())
-        elif 'has_symptoms' in df.columns:
-            days_with_symptoms = int(df['has_symptoms'].sum())
-            symptom_rate = float(df['has_symptoms'].mean())
-        elif 'symptom_count' in df.columns:
-            days_with_symptoms = int((df['symptom_count'] > 0).sum())
-            symptom_rate = float((df['symptom_count'] > 0).mean())
-        else:
-            days_with_symptoms = 0
-            symptom_rate = 0
+        # Headache+ = neuralgiform headaches (TN)
+        headache_plus_days = 0
+        headache_plus_rate = 0
+        if 'has_neuralgiaform' in df.columns:
+            headache_plus_days = int(df['has_neuralgiaform'].sum())
+            headache_plus_rate = float(df['has_neuralgiaform'].mean())
+        
+        # Regular headaches (non-TN) - has_headache but NOT neuralgiform
+        regular_headache_days = 0
+        if 'has_headache' in df.columns and 'has_neuralgiaform' in df.columns:
+            regular_headache_days = int((df['has_headache'].astype(bool) & ~df['has_neuralgiaform'].astype(bool)).sum())
+        
+        # Other symptoms (non-headache)
+        other_symptom_days = 0
+        if 'symptom_count' in df.columns and 'has_headache' in df.columns:
+            other_symptom_days = int(((df['symptom_count'] > 0) & ~df['has_headache'].astype(bool)).sum())
         
         # Only calculate means for non-null values
         avg_wellbeing = None
@@ -463,12 +465,27 @@ class AnalysisService:
             if len(valid) > 0:
                 avg_sleep_score = float(valid.mean())
         
+        # Headache+ severity stats (on neuralgiform days)
+        avg_headache_severity = None
+        if 'has_neuralgiaform' in df.columns and 'worst_symptom_severity' in df.columns:
+            headache_days_df = df[df['has_neuralgiaform'] == 1]
+            if len(headache_days_df) > 0:
+                valid_severity = headache_days_df['worst_symptom_severity'].dropna()
+                if len(valid_severity) > 0:
+                    avg_headache_severity = float(valid_severity.mean())
+        
         stats_dict = {
             'period_days': unique_dates,
             'start_date': df.index.min().strftime('%Y-%m-%d') if len(df) > 0 else None,
             'end_date': df.index.max().strftime('%Y-%m-%d') if len(df) > 0 else None,
-            'days_with_symptoms': days_with_symptoms,
-            'symptom_rate': symptom_rate,
+            # Headache+ (neuralgiform/TN - primary focus)
+            'headache_days': headache_plus_days,
+            'headache_rate': headache_plus_rate,
+            'avg_headache_severity': avg_headache_severity,
+            # Other categories
+            'regular_headache_days': regular_headache_days,
+            'other_symptom_days': other_symptom_days,
+            # General health
             'avg_wellbeing': avg_wellbeing,
             'avg_sleep_score': avg_sleep_score,
             'total_activity_hours': float(df['total_activity_minutes'].sum() / 60) if 'total_activity_minutes' in df.columns else 0,
@@ -477,6 +494,131 @@ class AnalysisService:
         
         return stats_dict
     
+    def calculate_fitness_metrics(
+        self,
+        end_date: Optional[date] = None,
+        lookback_days: int = 90,
+    ) -> dict:
+        """
+        Calculate Strava-style fitness metrics (CTL/ATL/TSB) from activity data.
+        
+        Uses suffer_score (Relative Effort) as the training stress metric.
+        
+        - CTL (Chronic Training Load / Fitness): 42-day exponential weighted average
+        - ATL (Acute Training Load / Fatigue): 7-day exponential weighted average  
+        - TSB (Training Stress Balance / Form): CTL - ATL
+        
+        Returns dict with current values and historical data for charting.
+        """
+        import numpy as np
+        from .database import AnalyticsDB
+        
+        if end_date is None:
+            end_date = date.today()
+        
+        # Need extra lookback for CTL to stabilize (42 days)
+        start_date = end_date - timedelta(days=lookback_days + 60)
+        
+        # Get daily suffer_score totals from activities
+        with AnalyticsDB() as db:
+            df = pd.read_sql("""
+                SELECT 
+                    entry_date,
+                    COALESCE(SUM(suffer_score), 0) as daily_stress
+                FROM activities
+                WHERE entry_date >= ? AND entry_date <= ?
+                GROUP BY entry_date
+                ORDER BY entry_date
+            """, db.conn, params=[start_date.isoformat(), end_date.isoformat()])
+        
+        if df.empty:
+            return {
+                'ctl': 0, 'atl': 0, 'tsb': 0,
+                'fitness_level': 'No data',
+                'history': {'dates': [], 'ctl': [], 'atl': [], 'tsb': []}
+            }
+        
+        # Create full date range and fill missing days with 0
+        df['entry_date'] = pd.to_datetime(df['entry_date'])
+        full_range = pd.date_range(start=start_date, end=end_date, freq='D')
+        df = df.set_index('entry_date').reindex(full_range, fill_value=0).reset_index()
+        df.columns = ['date', 'daily_stress']
+        
+        # Calculate exponential weighted moving averages
+        # CTL: 42-day time constant
+        # ATL: 7-day time constant
+        ctl_decay = 1 - np.exp(-1/42)
+        atl_decay = 1 - np.exp(-1/7)
+        
+        ctl_values = []
+        atl_values = []
+        tsb_values = []
+        
+        ctl = 0
+        atl = 0
+        
+        for _, row in df.iterrows():
+            stress = row['daily_stress']
+            ctl = ctl + (stress - ctl) * ctl_decay
+            atl = atl + (stress - atl) * atl_decay
+            tsb = ctl - atl
+            
+            ctl_values.append(round(ctl, 1))
+            atl_values.append(round(atl, 1))
+            tsb_values.append(round(tsb, 1))
+        
+        # Only return the requested lookback period for display
+        display_start =  60  # Skip warmup period
+        dates = df['date'].dt.strftime('%Y-%m-%d').tolist()[display_start:]
+        ctl_display = ctl_values[display_start:]
+        atl_display = atl_values[display_start:]
+        tsb_display = tsb_values[display_start:]
+        
+        # Current values
+        current_ctl = ctl_values[-1] if ctl_values else 0
+        current_atl = atl_values[-1] if atl_values else 0
+        current_tsb = tsb_values[-1] if tsb_values else 0
+        
+        # Fitness level interpretation
+        if current_ctl < 10:
+            fitness_level = 'Untrained'
+        elif current_ctl < 25:
+            fitness_level = 'Base'
+        elif current_ctl < 50:
+            fitness_level = 'Moderate'
+        elif current_ctl < 75:
+            fitness_level = 'Good'
+        elif current_ctl < 100:
+            fitness_level = 'Very Good'
+        else:
+            fitness_level = 'Excellent'
+        
+        # Form interpretation
+        if current_tsb < -30:
+            form_status = 'Very fatigued'
+        elif current_tsb < -10:
+            form_status = 'Fatigued'
+        elif current_tsb < 10:
+            form_status = 'Neutral'
+        elif current_tsb < 25:
+            form_status = 'Fresh'
+        else:
+            form_status = 'Very fresh'
+        
+        return {
+            'ctl': current_ctl,
+            'atl': current_atl,
+            'tsb': current_tsb,
+            'fitness_level': fitness_level,
+            'form_status': form_status,
+            'history': {
+                'dates': dates,
+                'ctl': ctl_display,
+                'atl': atl_display,
+                'tsb': tsb_display,
+            }
+        }
+
     def generate_chart_data(
         self,
         start_date: Optional[date] = None,
@@ -490,49 +632,60 @@ class AnalysisService:
         
         charts = {}
         
-        # Time series of symptom severity and wellbeing
+        # Time series focusing on headache+ (neuralgiform) episodes
         # Use None for missing values instead of 0 so charts can skip them
-        severity_col = None
-        if 'worst_symptom_severity' in df.columns:
-            severity_col = 'worst_symptom_severity'
-        elif 'has_headache' in df.columns:
-            severity_col = 'has_headache'
         
-        if severity_col:
-            # Convert to list, replacing NaN with None for JSON
-            severity_data = df[severity_col].where(pd.notna(df[severity_col]), None).tolist()
-            
-            wellbeing_data = []
-            if 'overall_wellbeing' in df.columns:
-                wellbeing_data = df['overall_wellbeing'].where(pd.notna(df['overall_wellbeing']), None).tolist()
-            
-            sleep_score_data = []
-            if 'sleep_score' in df.columns:
-                sleep_score_data = df['sleep_score'].where(pd.notna(df['sleep_score']), None).tolist()
-            
+        # Headache+ data (neuralgiform)
+        headache_data = []
+        if 'has_neuralgiaform' in df.columns:
+            # For headache+ days, show the severity; for other days, show 0
+            if 'worst_symptom_severity' in df.columns:
+                headache_data = [
+                    row['worst_symptom_severity'] if row['has_neuralgiaform'] == 1 else 0
+                    for _, row in df.iterrows()
+                ]
+            else:
+                headache_data = df['has_neuralgiaform'].fillna(0).tolist()
+        
+        wellbeing_data = []
+        if 'overall_wellbeing' in df.columns:
+            wellbeing_data = df['overall_wellbeing'].where(pd.notna(df['overall_wellbeing']), None).tolist()
+        
+        sleep_score_data = []
+        if 'sleep_score' in df.columns:
+            sleep_score_data = df['sleep_score'].where(pd.notna(df['sleep_score']), None).tolist()
+        
+        if len(headache_data) > 0 or len(wellbeing_data) > 0:
             charts['symptom_timeline'] = {
                 'dates': df.index.strftime('%Y-%m-%d').tolist(),
-                'severity': severity_data,
+                'severity': headache_data,  # Headache+ severity
                 'wellbeing': wellbeing_data,
                 'sleep_score': sleep_score_data,
             }
         
-        # Pressure vs symptoms scatter
-        if 'pressure_hpa' in df.columns and 'worst_symptom_severity' in df.columns:
-            mask = df['pressure_hpa'].notna() & df['worst_symptom_severity'].notna()
-            charts['pressure_scatter'] = {
-                'pressure': df.loc[mask, 'pressure_hpa'].tolist(),
-                'severity': df.loc[mask, 'worst_symptom_severity'].tolist(),
-                'dates': df.loc[mask].index.strftime('%Y-%m-%d').tolist(),
-            }
+        # Pressure vs headache+ severity scatter
+        if 'pressure_hpa' in df.columns and 'has_neuralgiaform' in df.columns:
+            # Only show days with headache+
+            headache_days = df[df['has_neuralgiaform'] == 1]
+            if 'worst_symptom_severity' in headache_days.columns:
+                mask = headache_days['pressure_hpa'].notna() & headache_days['worst_symptom_severity'].notna()
+                if mask.any():
+                    charts['pressure_scatter'] = {
+                        'pressure': headache_days.loc[mask, 'pressure_hpa'].tolist(),
+                        'severity': headache_days.loc[mask, 'worst_symptom_severity'].tolist(),
+                        'dates': headache_days.loc[mask].index.strftime('%Y-%m-%d').tolist(),
+                    }
         
-        # Sleep vs symptoms
-        if 'sleep_score' in df.columns and 'worst_symptom_severity' in df.columns:
-            mask = df['sleep_score'].notna() & df['worst_symptom_severity'].notna()
-            charts['sleep_scatter'] = {
-                'sleep_score': df.loc[mask, 'sleep_score'].tolist(),
-                'severity': df.loc[mask, 'worst_symptom_severity'].tolist(),
-            }
+        # Sleep vs headache+ occurrence
+        if 'sleep_score' in df.columns and 'has_neuralgiaform' in df.columns:
+            # Show all days, color by headache+ occurrence
+            mask = df['sleep_score'].notna()
+            if mask.any():
+                charts['sleep_scatter'] = {
+                    'sleep_score': df.loc[mask, 'sleep_score'].tolist(),
+                    'severity': df.loc[mask, 'has_neuralgiaform'].fillna(0).tolist(),
+                    'had_headache': df.loc[mask, 'has_neuralgiaform'].fillna(0).astype(int).tolist(),
+                }
         
         return charts
     
@@ -866,6 +1019,7 @@ class AnalysisService:
         """
         Generate actionable health insights based on the data.
         
+        Focuses on headache+ (neuralgiform) episodes as the primary target.
         Returns prioritized list of insights with specific recommendations.
         """
         df = self.build_dataframe(start_date, end_date)
@@ -875,29 +1029,34 @@ class AnalysisService:
         
         insights = []
         
-        # Determine symptom column
-        symptom_col = 'has_headache' if 'has_headache' in df.columns else 'has_symptoms' if 'has_symptoms' in df.columns else None
-        
-        if not symptom_col:
+        # Focus on headache+ (neuralgiform headaches)
+        if 'has_neuralgiaform' in df.columns:
+            symptom_col = 'has_neuralgiaform'
+        elif 'has_headache' in df.columns:
+            # Fallback if no neuralgiform column
+            symptom_col = 'has_headache'
+        else:
             return []
+        
+        symptom_name = 'headache+'
         
         # 1. Sleep quality impact
         if 'sleep_score' in df.columns:
             low_sleep = df[df['sleep_score'] < 70]
             high_sleep = df[df['sleep_score'] >= 70]
             
-            if len(low_sleep) >= 5 and len(high_sleep) >= 5:
-                low_sleep_symptom_rate = low_sleep[symptom_col].mean()
-                high_sleep_symptom_rate = high_sleep[symptom_col].mean()
+            if len(low_sleep) >= 3 and len(high_sleep) >= 3:
+                low_sleep_rate = low_sleep[symptom_col].mean()
+                high_sleep_rate = high_sleep[symptom_col].mean()
                 
-                if low_sleep_symptom_rate > high_sleep_symptom_rate * 1.3:  # 30% higher
-                    diff = (low_sleep_symptom_rate - high_sleep_symptom_rate) * 100
+                if low_sleep_rate > high_sleep_rate * 1.2:  # 20% higher
+                    diff = (low_sleep_rate - high_sleep_rate) * 100
                     insights.append({
                         'category': 'Sleep',
                         'priority': 'high',
-                        'insight': f'Poor sleep nights (<70 score) have {diff:.0f}% more symptom days',
-                        'recommendation': 'Focus on sleep hygiene. Consider consistent bedtime, limiting screens before bed, and avoiding late caffeine.',
-                        'data_quality': 'good' if len(low_sleep) >= 10 else 'limited',
+                        'insight': f'Poor sleep nights (<70 score) have {diff:.0f}% more {symptom_name} days',
+                        'recommendation': 'Sleep quality may be a trigger. Prioritize consistent sleep schedule and sleep hygiene.',
+                        'data_quality': 'good' if len(low_sleep) >= 7 else 'limited',
                     })
         
         # 2. Weekend patterns
@@ -905,53 +1064,54 @@ class AnalysisService:
             weekend = df[df['is_weekend'] == True]
             weekday = df[df['is_weekend'] == False]
             
-            if len(weekend) >= 5 and len(weekday) >= 10:
+            if len(weekend) >= 3 and len(weekday) >= 5:
                 weekend_rate = weekend[symptom_col].mean()
                 weekday_rate = weekday[symptom_col].mean()
                 
-                if abs(weekend_rate - weekday_rate) > 0.15:  # 15% difference
+                if abs(weekend_rate - weekday_rate) > 0.1:  # 10% difference
                     if weekend_rate > weekday_rate:
                         insights.append({
                             'category': 'Lifestyle',
                             'priority': 'medium',
-                            'insight': f'Weekend symptom rate is higher ({weekend_rate*100:.0f}% vs {weekday_rate*100:.0f}%)',
-                            'recommendation': 'Weekend triggers might include sleep schedule changes, alcohol, or different activities. Try maintaining consistent routines.',
+                            'insight': f'Weekend {symptom_name} rate is higher ({weekend_rate*100:.0f}% vs {weekday_rate*100:.0f}%)',
+                            'recommendation': 'Weekend triggers might include sleep schedule changes, stress letdown, or dietary differences.',
                             'data_quality': 'good',
                         })
                     else:
                         insights.append({
                             'category': 'Lifestyle',
                             'priority': 'medium',
-                            'insight': f'Weekday symptom rate is higher ({weekday_rate*100:.0f}% vs {weekend_rate*100:.0f}%)',
-                            'recommendation': 'Work stress, screen time, or weekday habits may be contributing. Consider stress management techniques.',
+                            'insight': f'Weekday {symptom_name} rate is higher ({weekday_rate*100:.0f}% vs {weekend_rate*100:.0f}%)',
+                            'recommendation': 'Work stress, posture, or screen time may be contributing. Consider ergonomics and stress management.',
                             'data_quality': 'good',
                         })
         
-        # 3. Caffeine impact (with lag)
-        if 'total_caffeine_mg' in df.columns:
-            df['caffeine_prev'] = df['total_caffeine_mg'].shift(1)
-            high_caffeine = df[df['caffeine_prev'] > 200]  # >200mg previous day
-            low_caffeine = df[df['caffeine_prev'] <= 200]
-            
-            if len(high_caffeine) >= 5 and len(low_caffeine) >= 5:
-                high_rate = high_caffeine[symptom_col].mean()
-                low_rate = low_caffeine[symptom_col].mean()
+        # 3. Weather/pressure sensitivity
+        if 'pressure_hpa' in df.columns:
+            valid_pressure = df[df['pressure_hpa'].notna()]
+            if len(valid_pressure) >= 10:
+                low_p = valid_pressure[valid_pressure['pressure_hpa'] < valid_pressure['pressure_hpa'].quantile(0.25)]
+                high_p = valid_pressure[valid_pressure['pressure_hpa'] > valid_pressure['pressure_hpa'].quantile(0.75)]
                 
-                if high_rate > low_rate * 1.2:
-                    insights.append({
-                        'category': 'Diet',
-                        'priority': 'medium',
-                        'insight': f'High caffeine days (>200mg) are followed by more symptoms',
-                        'recommendation': 'Consider limiting caffeine, especially after noon. Gradual reduction prevents withdrawal headaches.',
-                        'data_quality': 'good' if len(high_caffeine) >= 10 else 'limited',
-                    })
+                if len(low_p) >= 3 and len(high_p) >= 3:
+                    low_p_rate = low_p[symptom_col].mean()
+                    high_p_rate = high_p[symptom_col].mean()
+                    
+                    if low_p_rate > high_p_rate * 1.2:
+                        insights.append({
+                            'category': 'Weather',
+                            'priority': 'medium',
+                            'insight': f'Low pressure days show more {symptom_name} episodes ({low_p_rate*100:.0f}% vs {high_p_rate*100:.0f}%)',
+                            'recommendation': 'You may be barometrically sensitive. Consider preemptive measures when storms approach.',
+                            'data_quality': 'good',
+                        })
         
-        # 4. Exercise benefits
+        # 4. Exercise patterns
         if 'total_activity_minutes' in df.columns:
             active = df[df['total_activity_minutes'] >= 30]
             inactive = df[df['total_activity_minutes'] < 30]
             
-            if len(active) >= 5 and len(inactive) >= 5:
+            if len(active) >= 3 and len(inactive) >= 3:
                 active_rate = active[symptom_col].mean()
                 inactive_rate = inactive[symptom_col].mean()
                 
@@ -959,30 +1119,37 @@ class AnalysisService:
                     insights.append({
                         'category': 'Exercise',
                         'priority': 'medium',
-                        'insight': f'Days with 30+ min activity have fewer symptoms',
-                        'recommendation': 'Regular moderate exercise may help prevent symptoms. Even walking counts!',
-                        'data_quality': 'good' if len(active) >= 10 else 'limited',
+                        'insight': f'Days with 30+ min activity have fewer {symptom_name} episodes',
+                        'recommendation': 'Regular moderate exercise may help. Avoid overexertion which can trigger episodes.',
+                        'data_quality': 'good' if len(active) >= 7 else 'limited',
+                    })
+                elif active_rate > inactive_rate * 1.3:
+                    insights.append({
+                        'category': 'Exercise',
+                        'priority': 'medium',
+                        'insight': f'High activity days show more {symptom_name} episodes',
+                        'recommendation': 'Intense exercise may be a trigger. Consider moderating intensity or timing.',
+                        'data_quality': 'good' if len(active) >= 7 else 'limited',
                     })
         
-        # 5. Weather sensitivity
-        if 'pressure_hpa' in df.columns:
-            valid_pressure = df[df['pressure_hpa'].notna()]
-            if len(valid_pressure) >= 20:
-                low_p = valid_pressure[valid_pressure['pressure_hpa'] < valid_pressure['pressure_hpa'].quantile(0.25)]
-                high_p = valid_pressure[valid_pressure['pressure_hpa'] > valid_pressure['pressure_hpa'].quantile(0.75)]
+        # 5. Caffeine
+        if 'total_caffeine_mg' in df.columns:
+            df['caffeine_prev'] = df['total_caffeine_mg'].shift(1)
+            high_caffeine = df[df['caffeine_prev'] > 200]
+            low_caffeine = df[(df['caffeine_prev'] <= 200) & (df['caffeine_prev'] > 0)]
+            
+            if len(high_caffeine) >= 3 and len(low_caffeine) >= 3:
+                high_rate = high_caffeine[symptom_col].mean()
+                low_rate = low_caffeine[symptom_col].mean()
                 
-                if len(low_p) >= 5 and len(high_p) >= 5:
-                    low_p_rate = low_p[symptom_col].mean()
-                    high_p_rate = high_p[symptom_col].mean()
-                    
-                    if low_p_rate > high_p_rate * 1.3:
-                        insights.append({
-                            'category': 'Weather',
-                            'priority': 'low',
-                            'insight': f'Low pressure days show more symptoms ({low_p_rate*100:.0f}% vs {high_p_rate*100:.0f}%)',
-                            'recommendation': 'You may be weather-sensitive. Consider preemptive measures when storms approach.',
-                            'data_quality': 'good',
-                        })
+                if high_rate > low_rate * 1.2:
+                    insights.append({
+                        'category': 'Diet',
+                        'priority': 'medium',
+                        'insight': f'High caffeine days (>200mg) are followed by more {symptom_name} episodes',
+                        'recommendation': 'Consider limiting caffeine. Note: sudden caffeine withdrawal can also trigger episodes.',
+                        'data_quality': 'good' if len(high_caffeine) >= 7 else 'limited',
+                    })
         
         # Sort by priority
         priority_order = {'high': 0, 'medium': 1, 'low': 2}

@@ -225,10 +225,7 @@ async def new_entry_form(
     
     # Sync medicine/supplements from quick_log to medications/supplements lists
     _sync_quick_log_meds(entry, routines_service)
-    
-    # Sync caffeine/alcohol from quick_log to meals table (for calories tracking)
-    _sync_quick_log_beverages(target_date, entry.quick_log, routines_service)
-    
+
     # Sync quick_log to SQLite for analysis (caffeine/alcohol totals + checkbox factors)
     with AnalyticsDB() as analytics:
         analytics.sync_quick_log(target_date, entry.quick_log, quick_log_totals)

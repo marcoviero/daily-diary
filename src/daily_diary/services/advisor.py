@@ -105,7 +105,21 @@ Start by greeting them warmly and asking what brings them in today."""
         end_date = date.today()
         start_date = end_date - timedelta(days=days)
         
-        context_parts = [f"=== PATIENT HEALTH DATA (Last {days} days) ===\n"]
+        context_parts = []
+        
+        # Get user profile first
+        try:
+            from .database import AnalyticsDB
+            with AnalyticsDB() as db:
+                profile_summary = db.get_profile_summary_for_advisor()
+                if profile_summary:
+                    context_parts.append("=== PATIENT PROFILE ===")
+                    context_parts.append(profile_summary)
+                    context_parts.append("")
+        except Exception as e:
+            pass  # Profile not available
+        
+        context_parts.append(f"=== PATIENT HEALTH DATA (Last {days} days) ===\n")
         
         # Get entries from storage
         with DiaryStorage(sync_analytics=False) as storage:

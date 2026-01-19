@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Profile - Daily Health Diary{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <h1 class="text-3xl font-bold text-slate-200 mb-6">👤 Health Profile</h1>
+    
+    <form action="/profile/save" method="post" class="space-y-6">
+        
+        <!-- Basic Info -->
+        <div class="bg-slate-800 rounded-xl shadow p-6">
+            <h2 class="text-xl font-semibold mb-4 text-slate-200">Basic Information</h2>
+            
+            <div class="grid md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Name</label>
+                    <input type="text" name="name" value="{{ profile.name or '' }}"
+                           class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-slate-200">
+                </div>
+                
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Date of Birth</label>
+                    <input type="date" name="date_of_birth" value="{{ profile.date_of_birth or '' }}"
+                           class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-slate-200">
+                </div>
+                
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Biological Sex</label>
+                    <select name="biological_sex" class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-slate-200">
+                        <option value="">-- Select --</option>
+                        <option value="Male" {% if profile.biological_sex == 'Male' %}selected{% endif %}>Male</option>
+                        <option value="Female" {% if profile.biological_sex == 'Female' %}selected{% endif %}>Female</option>
+                        <option value="Other" {% if profile.biological_sex == 'Other' %}selected{% endif %}>Other</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Blood Type</label>
+                    <select name="blood_type" class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-slate-200">
+                        <option value="">-- Select --</option>
+                        {% for bt in ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] %}
+                        <option value="{{ bt }}" {% if profile.blood_type == bt %}selected{% endif %}>{{ bt }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Height (cm)</label>
+                    <input type="number" name="height_cm" value="{{ profile.height_cm or '' }}" step="0.1"
+                           class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-slate-200">
+                </div>
+                
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Weight (kg)</label>
+                    <input type="number" name="weight_kg" value="{{ profile.weight_kg or '' }}" step="0.1"
+                           class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-slate-200">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Medical Conditions -->
+        <div class="bg-slate-800 rounded-xl shadow p-6">
+            <h2 class="text-xl font-semibold mb-4 text-slate-200">Medical Information</h2>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">
+                        Conditions <span class="text-slate-500">(comma-separated)</span>
+                    </label>
+                    <input type="text" name="conditions" 
+                           value="{{ profile.conditions | join(', ') if profile.conditions else '' }}"
+                           placeholder="e.g., Trigeminal Neuralgia, Multiple Sclerosis"
+                           class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-slate-200">
+                    <p class="text-xs text-slate-500 mt-1">Include any diagnosed conditions relevant to your health tracking</p>
+                </div>
+                
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">
+                        Allergies <span class="text-slate-500">(comma-separated)</span>
+                    </label>
+                    <input type="text" name="allergies" 
+                           value="{{ profile.allergies | join(', ') if profile.allergies else '' }}"
+                           placeholder="e.g., Penicillin, Shellfish, Latex"
+                           class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-slate-200">
+                </div>
+                
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">
+                        Current Medications <span class="text-slate-500">(comma-separated)</span>
+                    </label>
+                    <input type="text" name="current_medications" 
+                           value="{{ profile.current_medications | join(', ') if profile.current_medications else '' }}"
+                           placeholder="e.g., Carbamazepine 200mg, Lisinopril 10mg"
+                           class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-slate-200">
+                    <p class="text-xs text-slate-500 mt-1">Daily/ongoing medications (individual doses are tracked in entries)</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Healthcare Providers -->
+        <div class="bg-slate-800 rounded-xl shadow p-6">
+            <h2 class="text-xl font-semibold mb-4 text-slate-200">Healthcare</h2>
+            
+            <div class="grid md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Primary Care Physician</label>
+                    <input type="text" name="primary_care_physician" value="{{ profile.primary_care_physician or '' }}"
+                           placeholder="Dr. Smith"
+                           class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-slate-200">
+                </div>
+                
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Pharmacy</label>
+                    <input type="text" name="pharmacy" value="{{ profile.pharmacy or '' }}"
+                           placeholder="CVS on Main St"
+                           class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-slate-200">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Emergency Contact -->
+        <div class="bg-slate-800 rounded-xl shadow p-6">
+            <h2 class="text-xl font-semibold mb-4 text-slate-200">Emergency Contact</h2>
+            
+            <div class="grid md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Name</label>
+                    <input type="text" name="emergency_contact_name" value="{{ profile.emergency_contact_name or '' }}"
+                           class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-slate-200">
+                </div>
+                
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Phone</label>
+                    <input type="tel" name="emergency_contact_phone" value="{{ profile.emergency_contact_phone or '' }}"
+                           class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-slate-200">
+                </div>
+                
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Relationship</label>
+                    <input type="text" name="emergency_contact_relation" value="{{ profile.emergency_contact_relation or '' }}"
+                           placeholder="Spouse, Parent, etc."
+                           class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-slate-200">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Notes -->
+        <div class="bg-slate-800 rounded-xl shadow p-6">
+            <h2 class="text-xl font-semibold mb-4 text-slate-200">Health Notes</h2>
+            
+            <textarea name="health_notes" rows="4"
+                      placeholder="Any additional health information, goals, or notes..."
+                      class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-slate-200">{{ profile.health_notes or '' }}</textarea>
+        </div>
+        
+        <!-- Submit -->
+        <div class="flex justify-end gap-4">
+            <a href="/" class="px-6 py-2 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700">
+                Cancel
+            </a>
+            <button type="submit" class="px-6 py-2 rounded-lg bg-teal-600 text-white hover:bg-teal-700">
+                Save Profile
+            </button>
+        </div>
+    </form>
+    
+    <div class="mt-8 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+        <p class="text-sm text-slate-400">
+            💡 Your profile information is used to provide personalized context to the Health Advisor 
+            and won't be shared externally.
+        </p>
+    </div>
+</div>
+{% endblock %}

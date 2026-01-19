@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .routes import advisor, analysis, entries, meals
+from .routes import advisor, analysis, entries, meals, profile
 
 # Paths
 WEB_DIR = Path(__file__).parent
@@ -33,6 +33,7 @@ app.include_router(entries.router, prefix="/entries", tags=["entries"])
 app.include_router(meals.router, prefix="/meals", tags=["meals"])
 app.include_router(analysis.router, prefix="/analysis", tags=["analysis"])
 app.include_router(advisor.router, prefix="/advisor", tags=["advisor"])
+app.include_router(profile.router, prefix="/profile", tags=["profile"])
 
 
 @app.get("/", response_class=HTMLResponse)

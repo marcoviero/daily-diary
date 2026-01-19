@@ -28,7 +28,7 @@ async def analysis_dashboard(
     # Get all analysis data
     summary = service.get_summary_stats(start_date, end_date)
     correlations = service.analyze_symptom_correlations(
-        target='has_headache',  # Use binary column for clearer results
+        target='has_neuralgiaform',  # headache+ = neuralgiform headaches
         start_date=start_date,
         end_date=end_date,
     )
@@ -38,12 +38,15 @@ async def analysis_dashboard(
     
     # New: Lag correlations and actionable insights
     lag_correlations = service.analyze_lag_correlations(
-        target='has_headache',
+        target='has_neuralgiaform',  # headache+ = neuralgiform headaches
         start_date=start_date,
         end_date=end_date,
         max_lag_days=3,
     )
     actionable_insights = service.get_actionable_insights(start_date, end_date)
+    
+    # Fitness metrics (CTL/ATL/TSB)
+    fitness_metrics = service.calculate_fitness_metrics(end_date, lookback_days=days)
     
     # Filter to significant correlations for display
     significant_correlations = [c for c in correlations if c.is_significant]
@@ -61,6 +64,7 @@ async def analysis_dashboard(
             "medication_analysis": medication_analysis,
             "lag_correlations": lag_correlations,
             "actionable_insights": actionable_insights,
+            "fitness_metrics": fitness_metrics,
         },
     )
 

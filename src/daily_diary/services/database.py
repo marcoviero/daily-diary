@@ -440,6 +440,36 @@ class AnalyticsDB:
             )
         """)
         
+        # ===== USER PROFILE TABLE =====
+        # Static user info (not daily data)
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS user_profile (
+                id INTEGER PRIMARY KEY CHECK (id = 1),  -- Only one row allowed
+                name TEXT,
+                date_of_birth TEXT,
+                height_cm REAL,
+                weight_kg REAL,
+                blood_type TEXT,
+                biological_sex TEXT,
+                -- Medical conditions (JSON array)
+                conditions_json TEXT,  -- e.g., ["Trigeminal Neuralgia", "MS"]
+                -- Allergies (JSON array)
+                allergies_json TEXT,  -- e.g., ["Penicillin", "Shellfish"]
+                -- Current medications (JSON array for quick reference)
+                current_medications_json TEXT,
+                -- Emergency contact
+                emergency_contact_name TEXT,
+                emergency_contact_phone TEXT,
+                emergency_contact_relation TEXT,
+                -- Preferences
+                primary_care_physician TEXT,
+                pharmacy TEXT,
+                health_notes TEXT,  -- General notes, goals, etc.
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
         # Create indexes
         self._create_indexes()
         self.conn.commit()
@@ -758,7 +788,7 @@ class AnalyticsDB:
         else:
             # Insert new row with just meal data
             self.conn.execute("""
-                INSERT INTO daily_summary (
+                INSERT OR REPLACE INTO daily_summary (
                     entry_date, meal_count, total_calories, total_protein_g,
                     total_carbs_g, total_fat_g, total_fiber_g,
                     total_caffeine_mg, total_alcohol_units, total_water_ml, updated_at
@@ -1129,7 +1159,7 @@ class AnalyticsDB:
             """, [caffeine_mg, alcohol_units, datetime.now().isoformat(), entry_date_str])
         else:
             self.conn.execute("""
-                INSERT INTO daily_summary (entry_date, total_caffeine_mg, total_alcohol_units, updated_at)
+                INSERT OR REPLACE INTO daily_summary (entry_date, total_caffeine_mg, total_alcohol_units, updated_at)
                 VALUES (?, ?, ?, ?)
             """, [entry_date_str, caffeine_mg, alcohol_units, datetime.now().isoformat()])
         
@@ -1379,6 +1409,122 @@ class AnalyticsDB:
         params.append(limit)
         
         return pd.read_sql(query, self.conn, params=params)
+    
+    # ===== USER PROFILE METHODS =====
+    
+    def get_user_profile(self) -> Optional[dict]:
+        """Get the user profile (only one row exists)."""
+        cursor = self.conn.execute("SELECT * FROM user_profile WHERE id = 1")
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        
+        profile = dict(row)
+        
+        # Parse JSON fields
+        for json_field in ['conditions_json', 'allergies_json', 'current_medications_json']:
+            if profile.get(json_field):
+                try:
+                    profile[json_field.replace('_json', '')] = json.loads(profile[json_field])
+                except:
+                    profile[json_field.replace('_json', '')] = []
+            else:
+                profile[json_field.replace('_json', '')] = []
+        
+        return profile
+    
+    def save_user_profile(self, profile: dict) -> None:
+        """Save or update user profile."""
+        # Convert lists to JSON
+        conditions_json = json.dumps(profile.get('conditions', []))
+        allergies_json = json.dumps(profile.get('allergies', []))
+        medications_json = json.dumps(profile.get('current_medications', []))
+        
+        # Upsert (insert or replace)
+        self.conn.execute("""
+            INSERT INTO user_profile (
+                id, name, date_of_birth, height_cm, weight_kg, blood_type, biological_sex,
+                conditions_json, allergies_json, current_medications_json,
+                emergency_contact_name, emergency_contact_phone, emergency_contact_relation,
+                primary_care_physician, pharmacy, health_notes, updated_at
+            ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(id) DO UPDATE SET
+                name = excluded.name,
+                date_of_birth = excluded.date_of_birth,
+                height_cm = excluded.height_cm,
+                weight_kg = excluded.weight_kg,
+                blood_type = excluded.blood_type,
+                biological_sex = excluded.biological_sex,
+                conditions_json = excluded.conditions_json,
+                allergies_json = excluded.allergies_json,
+                current_medications_json = excluded.current_medications_json,
+                emergency_contact_name = excluded.emergency_contact_name,
+                emergency_contact_phone = excluded.emergency_contact_phone,
+                emergency_contact_relation = excluded.emergency_contact_relation,
+                primary_care_physician = excluded.primary_care_physician,
+                pharmacy = excluded.pharmacy,
+                health_notes = excluded.health_notes,
+                updated_at = CURRENT_TIMESTAMP
+        """, [
+            profile.get('name'),
+            profile.get('date_of_birth'),
+            profile.get('height_cm'),
+            profile.get('weight_kg'),
+            profile.get('blood_type'),
+            profile.get('biological_sex'),
+            conditions_json,
+            allergies_json,
+            medications_json,
+            profile.get('emergency_contact_name'),
+            profile.get('emergency_contact_phone'),
+            profile.get('emergency_contact_relation'),
+            profile.get('primary_care_physician'),
+            profile.get('pharmacy'),
+            profile.get('health_notes'),
+        ])
+        self.conn.commit()
+    
+    def get_profile_summary_for_advisor(self) -> str:
+        """Get a formatted profile summary for the Health Advisor context."""
+        profile = self.get_user_profile()
+        if not profile:
+            return ""
+        
+        parts = []
+        
+        if profile.get('name'):
+            parts.append(f"Patient: {profile['name']}")
+        
+        if profile.get('date_of_birth'):
+            try:
+                dob = datetime.strptime(profile['date_of_birth'], '%Y-%m-%d')
+                age = (datetime.now() - dob).days // 365
+                parts.append(f"Age: {age}")
+            except:
+                pass
+        
+        if profile.get('biological_sex'):
+            parts.append(f"Sex: {profile['biological_sex']}")
+        
+        if profile.get('height_cm'):
+            parts.append(f"Height: {profile['height_cm']} cm")
+        
+        if profile.get('weight_kg'):
+            parts.append(f"Weight: {profile['weight_kg']} kg")
+        
+        if profile.get('conditions'):
+            parts.append(f"Conditions: {', '.join(profile['conditions'])}")
+        
+        if profile.get('allergies'):
+            parts.append(f"Allergies: {', '.join(profile['allergies'])}")
+        
+        if profile.get('current_medications'):
+            parts.append(f"Current medications: {', '.join(profile['current_medications'])}")
+        
+        if profile.get('health_notes'):
+            parts.append(f"Notes: {profile['health_notes']}")
+        
+        return "\n".join(parts)
     
     def close(self) -> None:
         """Close database connection."""

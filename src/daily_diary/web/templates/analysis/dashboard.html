@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="flex justify-between items-center mb-6">
-    <h1 class="text-3xl font-bold text-slate-200">📊 Health Analysis</h1>
+    <h1 class="text-3xl font-bold text-slate-200">📊 Headache+ Analysis</h1>
     <select onchange="window.location.href='/analysis/?days=' + this.value" 
             class="bg-slate-700 border border-slate-600 rounded px-3 py-2 text-slate-200">
         <option value="30" {% if days == 30 %}selected{% endif %}>Last 30 days</option>
@@ -27,18 +27,22 @@
 {% else %}
 
 <!-- Summary Cards -->
-<div class="grid md:grid-cols-4 gap-4 mb-6">
+<div class="grid md:grid-cols-5 gap-4 mb-6">
     <div class="bg-slate-800 rounded-xl shadow p-6">
         <div class="text-3xl font-bold text-indigo-400">{{ summary.period_days }}</div>
-        <div class="text-sm text-slate-400">Days with Data</div>
+        <div class="text-sm text-slate-400">Days Tracked</div>
+    </div>
+    <div class="bg-slate-800 rounded-xl shadow p-6 border-l-4 border-red-500">
+        <div class="text-3xl font-bold text-red-400">{{ summary.headache_days }}</div>
+        <div class="text-sm text-slate-400">Headache+ Days ({{ (summary.headache_rate * 100)|round|int }}%)</div>
     </div>
     <div class="bg-slate-800 rounded-xl shadow p-6">
-        <div class="text-3xl font-bold text-red-400">{{ summary.days_with_symptoms }}</div>
-        <div class="text-sm text-slate-400">Days with Headaches ({{ (summary.symptom_rate * 100)|round|int }}%)</div>
+        <div class="text-3xl font-bold text-orange-400">{{ summary.avg_headache_severity|round(1) if summary.avg_headache_severity else '-' }}</div>
+        <div class="text-sm text-slate-400">Avg Severity</div>
     </div>
     <div class="bg-slate-800 rounded-xl shadow p-6">
         <div class="text-3xl font-bold text-green-400">{{ summary.avg_wellbeing|round(1) if summary.avg_wellbeing else '-' }}</div>
-        <div class="text-sm text-slate-400">Avg Wellbeing (1-10)</div>
+        <div class="text-sm text-slate-400">Avg Wellbeing</div>
     </div>
     <div class="bg-slate-800 rounded-xl shadow p-6">
         <div class="text-3xl font-bold text-blue-400">{{ summary.avg_sleep_score|round|int if summary.avg_sleep_score else '-' }}</div>
@@ -46,7 +50,63 @@
     </div>
 </div>
 
-<!-- Actionable Insights (Priority Section) -->
+<!-- Fitness Metrics -->
+{% if fitness_metrics and fitness_metrics.ctl > 0 %}
+<div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
+    <h2 class="text-xl font-semibold mb-4 text-slate-200">🏋️ Training Fitness</h2>
+    
+    <div class="grid md:grid-cols-2 gap-6">
+        <!-- Fitness Gauge -->
+        <div class="flex flex-col items-center">
+            <div id="fitness-gauge" style="height: 200px; width: 100%;"></div>
+            <div class="text-center mt-2">
+                <div class="text-2xl font-bold text-emerald-400">{{ fitness_metrics.fitness_level }}</div>
+                <div class="text-sm text-slate-400">Fitness Level (CTL: {{ fitness_metrics.ctl|round(1) }})</div>
+            </div>
+        </div>
+        
+        <!-- Form/Freshness -->
+        <div class="flex flex-col justify-center">
+            <div class="grid grid-cols-3 gap-4 text-center">
+                <div class="p-4 rounded-lg bg-emerald-900/30 border border-emerald-700/50">
+                    <div class="text-2xl font-bold text-emerald-400">{{ fitness_metrics.ctl|round(1) }}</div>
+                    <div class="text-xs text-slate-400">Fitness (CTL)</div>
+                </div>
+                <div class="p-4 rounded-lg bg-orange-900/30 border border-orange-700/50">
+                    <div class="text-2xl font-bold text-orange-400">{{ fitness_metrics.atl|round(1) }}</div>
+                    <div class="text-xs text-slate-400">Fatigue (ATL)</div>
+                </div>
+                <div class="p-4 rounded-lg {% if fitness_metrics.tsb >= 0 %}bg-blue-900/30 border border-blue-700/50{% else %}bg-red-900/30 border border-red-700/50{% endif %}">
+                    <div class="text-2xl font-bold {% if fitness_metrics.tsb >= 0 %}text-blue-400{% else %}text-red-400{% endif %}">{{ fitness_metrics.tsb|round(1) }}</div>
+                    <div class="text-xs text-slate-400">Form (TSB)</div>
+                </div>
+            </div>
+            <div class="text-center mt-4">
+                <span class="px-3 py-1 rounded-full text-sm
+                    {% if 'fresh' in fitness_metrics.form_status|lower %}bg-blue-900/50 text-blue-300
+                    {% elif 'fatigued' in fitness_metrics.form_status|lower %}bg-red-900/50 text-red-300
+                    {% else %}bg-slate-700 text-slate-300{% endif %}">
+                    {{ fitness_metrics.form_status }}
+                </span>
+            </div>
+            <p class="text-xs text-slate-500 mt-4 text-center">
+                Based on Strava Relative Effort (suffer score).<br>
+                CTL = 42-day avg, ATL = 7-day avg, TSB = CTL - ATL
+            </p>
+        </div>
+    </div>
+    
+    <!-- Fitness Trend Chart -->
+    {% if fitness_metrics.history.dates %}
+    <div class="mt-6">
+        <h3 class="text-lg font-medium mb-3 text-slate-300">Fitness Trend</h3>
+        <div id="fitness-trend" style="height: 250px;"></div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Actionable Insights -->
 {% if actionable_insights %}
 <div class="bg-gradient-to-r from-teal-900/50 to-slate-800 rounded-xl shadow p-6 mb-6 border border-teal-700/50">
     <h2 class="text-xl font-semibold mb-4 text-teal-300">💡 Key Insights</h2>
@@ -87,16 +147,16 @@
 <!-- Timeline Chart -->
 {% if chart_data.get('symptom_timeline') %}
 <div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
-    <h2 class="text-xl font-semibold mb-4 text-slate-200">📈 Health Timeline</h2>
+    <h2 class="text-xl font-semibold mb-4 text-slate-200">📈 Headache+ Timeline</h2>
     <div id="symptom-timeline" style="height: 300px;"></div>
 </div>
 {% endif %}
 
-<!-- Lag Correlations (Delayed Effects) -->
+<!-- Lag Correlations -->
 {% if lag_correlations %}
 <div class="bg-slate-800 rounded-xl shadow p-6 mb-6">
     <h2 class="text-xl font-semibold mb-2 text-slate-200">⏱️ Delayed Effects</h2>
-    <p class="text-sm text-slate-400 mb-4">These factors show relationships with symptoms at various time delays</p>
+    <p class="text-sm text-slate-400 mb-4">Factors that may trigger or prevent headache+ episodes with time delays</p>
     
     <div class="grid md:grid-cols-2 gap-4">
         {% for corr in lag_correlations[:8] %}
@@ -227,14 +287,14 @@
 <div class="grid md:grid-cols-2 gap-6 mb-6">
     {% if chart_data.get('pressure_scatter') %}
     <div class="bg-slate-800 rounded-xl shadow p-6">
-        <h3 class="text-lg font-semibold mb-4 text-slate-200">Pressure vs Symptoms</h3>
+        <h3 class="text-lg font-semibold mb-4 text-slate-200">Pressure vs Severity</h3>
         <div id="pressure-scatter" style="height: 250px;"></div>
     </div>
     {% endif %}
     
     {% if chart_data.get('sleep_scatter') %}
     <div class="bg-slate-800 rounded-xl shadow p-6">
-        <h3 class="text-lg font-semibold mb-4 text-slate-200">Sleep vs Symptoms</h3>
+        <h3 class="text-lg font-semibold mb-4 text-slate-200">Sleep vs Headache+</h3>
         <div id="sleep-scatter" style="height: 250px;"></div>
     </div>
     {% endif %}
@@ -256,7 +316,7 @@
         yaxis: { gridcolor: '#334155', zerolinecolor: '#475569' }
     };
     
-    // Health Timeline with proper null handling
+    // Headache+ Timeline
     if (chartData.symptom_timeline) {
         const dates = chartData.symptom_timeline.dates;
         const severity = chartData.symptom_timeline.severity;
@@ -265,19 +325,19 @@
         
         const timelineData = [];
         
-        // Headache severity (show as bars for discrete events)
+        // Headache+ severity (show as bars)
         if (severity && severity.some(v => v !== null && v > 0)) {
             timelineData.push({
                 x: dates,
                 y: severity.map(v => v === null ? 0 : v),
                 type: 'bar',
-                name: 'Headache Severity',
-                marker: { color: 'rgba(239, 68, 68, 0.7)' },
+                name: 'Headache+ Severity',
+                marker: { color: 'rgba(239, 68, 68, 0.8)' },
                 yaxis: 'y'
             });
         }
         
-        // Wellbeing (line, skip nulls)
+        // Wellbeing line
         if (wellbeing && wellbeing.some(v => v !== null)) {
             const wellbeingFiltered = wellbeing.map((v, i) => ({x: dates[i], y: v}))
                 .filter(d => d.y !== null);
@@ -295,7 +355,7 @@
             });
         }
         
-        // Sleep score (line, different axis)
+        // Sleep score line
         if (sleepScore && sleepScore.some(v => v !== null)) {
             const sleepFiltered = sleepScore.map((v, i) => ({x: dates[i], y: v}))
                 .filter(d => d.y !== null);
@@ -332,7 +392,7 @@
         }
     }
     
-    // Pressure Scatter
+    // Pressure vs Severity Scatter
     if (chartData.pressure_scatter && chartData.pressure_scatter.pressure.length > 0) {
         Plotly.newPlot('pressure-scatter', [{
             x: chartData.pressure_scatter.pressure,
@@ -340,11 +400,10 @@
             mode: 'markers',
             type: 'scatter',
             marker: { 
-                size: 10, 
+                size: 12, 
                 color: chartData.pressure_scatter.severity,
-                colorscale: 'RdYlGn',
-                reversescale: true,
-                opacity: 0.7
+                colorscale: 'Reds',
+                opacity: 0.8
             },
             text: chartData.pressure_scatter.dates,
             hovertemplate: '%{text}<br>Pressure: %{x} hPa<br>Severity: %{y}<extra></extra>'
@@ -356,26 +415,121 @@
         }, { responsive: true });
     }
     
-    // Sleep Scatter
+    // Sleep vs Headache+ Scatter
     if (chartData.sleep_scatter && chartData.sleep_scatter.sleep_score.length > 0) {
+        const hadHeadache = chartData.sleep_scatter.had_headache || chartData.sleep_scatter.severity;
         Plotly.newPlot('sleep-scatter', [{
             x: chartData.sleep_scatter.sleep_score,
-            y: chartData.sleep_scatter.severity,
+            y: hadHeadache,
             mode: 'markers',
             type: 'scatter',
             marker: { 
                 size: 10, 
-                color: chartData.sleep_scatter.severity,
-                colorscale: 'RdYlGn',
-                reversescale: true,
+                color: hadHeadache.map(v => v > 0 ? '#ef4444' : '#22c55e'),
                 opacity: 0.7
-            }
+            },
+            hovertemplate: 'Sleep: %{x}<br>Headache+: %{y}<extra></extra>'
         }], {
             ...darkLayout,
             margin: { t: 20, r: 20, l: 50, b: 40 },
             xaxis: { ...darkLayout.xaxis, title: 'Sleep Score' },
-            yaxis: { ...darkLayout.yaxis, title: 'Severity', range: [0, 10] }
+            yaxis: { ...darkLayout.yaxis, title: 'Had Headache+', tickvals: [0, 1], ticktext: ['No', 'Yes'] }
         }, { responsive: true });
     }
+    
+    // Fitness Gauge
+    {% if fitness_metrics and fitness_metrics.ctl > 0 %}
+    const fitnessData = {{ fitness_metrics | tojson | safe }};
+    
+    // Semi-circular gauge for fitness level
+    if (document.getElementById('fitness-gauge')) {
+        const ctl = fitnessData.ctl;
+        // Scale: 0-150 CTL range
+        const gaugeMax = 150;
+        const gaugeValue = Math.min(ctl, gaugeMax);
+        
+        Plotly.newPlot('fitness-gauge', [{
+            type: 'indicator',
+            mode: 'gauge+number',
+            value: gaugeValue,
+            number: { suffix: '', font: { color: '#10b981' } },
+            gauge: {
+                axis: { 
+                    range: [0, gaugeMax], 
+                    tickwidth: 1, 
+                    tickcolor: '#475569',
+                    tickfont: { color: '#94a3b8' }
+                },
+                bar: { color: '#10b981', thickness: 0.75 },
+                bgcolor: '#1e293b',
+                borderwidth: 0,
+                steps: [
+                    { range: [0, 10], color: '#991b1b' },    // Untrained
+                    { range: [10, 25], color: '#b45309' },   // Base
+                    { range: [25, 50], color: '#a16207' },   // Moderate
+                    { range: [50, 75], color: '#4d7c0f' },   // Good
+                    { range: [75, 100], color: '#15803d' },  // Very Good
+                    { range: [100, 150], color: '#047857' }, // Excellent
+                ],
+                threshold: {
+                    line: { color: '#f59e0b', width: 4 },
+                    thickness: 0.75,
+                    value: ctl
+                }
+            }
+        }], {
+            ...darkLayout,
+            margin: { t: 30, r: 25, l: 25, b: 10 },
+        }, { responsive: true });
+    }
+    
+    // Fitness Trend Chart
+    if (document.getElementById('fitness-trend') && fitnessData.history && fitnessData.history.dates.length > 0) {
+        const trendData = [
+            {
+                x: fitnessData.history.dates,
+                y: fitnessData.history.ctl,
+                type: 'scatter',
+                mode: 'lines',
+                name: 'Fitness (CTL)',
+                line: { color: '#10b981', width: 2 }
+            },
+            {
+                x: fitnessData.history.dates,
+                y: fitnessData.history.atl,
+                type: 'scatter',
+                mode: 'lines',
+                name: 'Fatigue (ATL)',
+                line: { color: '#f97316', width: 2, dash: 'dot' }
+            },
+            {
+                x: fitnessData.history.dates,
+                y: fitnessData.history.tsb,
+                type: 'scatter',
+                mode: 'lines',
+                name: 'Form (TSB)',
+                line: { color: '#3b82f6', width: 2 },
+                fill: 'tozeroy',
+                fillcolor: 'rgba(59, 130, 246, 0.1)'
+            }
+        ];
+        
+        Plotly.newPlot('fitness-trend', trendData, {
+            ...darkLayout,
+            margin: { t: 20, r: 20, l: 50, b: 40 },
+            xaxis: { ...darkLayout.xaxis, title: '' },
+            yaxis: { ...darkLayout.yaxis, title: 'Training Load' },
+            legend: { x: 0, y: 1.1, orientation: 'h', font: { color: '#94a3b8' } },
+            shapes: [{
+                type: 'line',
+                x0: fitnessData.history.dates[0],
+                x1: fitnessData.history.dates[fitnessData.history.dates.length - 1],
+                y0: 0,
+                y1: 0,
+                line: { color: '#475569', width: 1, dash: 'dash' }
+            }]
+        }, { responsive: true });
+    }
+    {% endif %}
 </script>
 {% endblock %}
