@@ -197,7 +197,7 @@ Return ONLY the JSON object, no other text."""
         """Try parsing with Claude."""
         try:
             response = self.anthropic_client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-6",
                 max_tokens=2000,
                 messages=[
                     {"role": "user", "content": f"{self.SYSTEM_PROMPT}\n\nDiary entry to parse:\n\n{text}"}

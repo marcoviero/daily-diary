@@ -588,7 +588,7 @@ Start by greeting them warmly and asking what brings them in today."""
                 messages.append({"role": "user", "content": user_message})
             
             response = self.anthropic_client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-opus-4-8",
                 max_tokens=1500,
                 system=system_prompt,
                 messages=messages,

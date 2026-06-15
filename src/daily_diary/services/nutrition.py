@@ -162,7 +162,7 @@ The "components" array is REQUIRED and must itemize every part of the meal."""
                 return None
             
             response = self.anthropic_client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-6",
                 max_tokens=800,
                 temperature=0.7,
                 messages=[
@@ -193,7 +193,7 @@ The "components" array is REQUIRED and must itemize every part of the meal."""
             try:
                 result = json.loads(json_text.strip())
                 result["source"] = "llm"
-                result["model"] = "claude-sonnet-4-20250514"
+                result["model"] = "claude-sonnet-4-6"
                 return result
             except json.JSONDecodeError as e:
                 # Print what we got for debugging
