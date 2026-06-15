@@ -163,7 +163,7 @@ The "components" array is REQUIRED and must itemize every part of the meal."""
             
             response = self.anthropic_client.messages.create(
                 model="claude-sonnet-4-6",
-                max_tokens=800,
+                max_tokens=2000,
                 temperature=0.7,
                 messages=[
                     {"role": "user", "content": f"{self.SYSTEM_PROMPT}\n\n{prompt}"}
