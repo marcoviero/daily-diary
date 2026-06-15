@@ -5,6 +5,10 @@
 # Data (keep local, don't sync PHI to GitHub)
 data/*.json
 data/*.db
+data/analytics.db-wal
+data/analytics.db-shm
+data/analytics.db.backup_*
+data/*.backup_*
 
 # Python
 __pycache__/
