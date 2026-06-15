@@ -511,44 +511,48 @@ def log_meal(
     from .services.database import AnalyticsDB
     
     entry_date = parse_date(date_str)
-    
+
     console.print(f"\n[bold]Logging meal for {entry_date}[/bold]")
     console.print(f"  {meal_type.capitalize()}: {description}")
-    
-    nutrition = {}
-    if not no_estimate:
-        console.print("\n[dim]Estimating nutrition...[/dim]")
-        estimator = NutritionEstimator()
-        nutrition = estimator.estimate(description, meal_type)
-        
-        if nutrition.get("source") == "llm":
-            console.print(f"[green]✓ LLM estimation (confidence: {nutrition.get('confidence', 0):.0%})[/green]")
-        else:
-            console.print("[yellow]⚠ Heuristic estimation (LLM unavailable)[/yellow]")
-        
-        # Show nutrition summary
-        table = Table(title="Nutritional Estimate")
-        table.add_column("Nutrient", style="cyan")
-        table.add_column("Amount", justify="right")
-        
-        table.add_row("Calories", f"{nutrition.get('calories', 0):.0f} kcal")
-        table.add_row("Protein", f"{nutrition.get('protein_g', 0):.1f} g")
-        table.add_row("Carbs", f"{nutrition.get('carbs_g', 0):.1f} g")
-        table.add_row("Fat", f"{nutrition.get('fat_g', 0):.1f} g")
-        table.add_row("Fiber", f"{nutrition.get('fiber_g', 0):.1f} g")
-        
-        if nutrition.get('caffeine_mg', 0) > 0:
-            table.add_row("Caffeine", f"{nutrition.get('caffeine_mg', 0):.0f} mg")
-        if nutrition.get('alcohol_units', 0) > 0:
-            table.add_row("Alcohol", f"{nutrition.get('alcohol_units', 0):.1f} units")
-        
-        console.print(table)
-        
-        if nutrition.get("reasoning"):
-            console.print(f"\n[dim]Reasoning: {nutrition['reasoning']}[/dim]")
-    
-    # Save to database
+
     with AnalyticsDB() as analytics:
+        nutrition = {}
+        if not no_estimate:
+            cached = analytics.find_cached_meal_nutrition(description, meal_type)
+            if cached:
+                nutrition = cached
+                console.print(f"[cyan]✓ Using cached nutrition (identical meal logged previously)[/cyan]")
+            else:
+                console.print("\n[dim]Estimating nutrition...[/dim]")
+                estimator = NutritionEstimator()
+                nutrition = estimator.estimate(description, meal_type)
+
+                if nutrition.get("source") == "llm":
+                    console.print(f"[green]✓ LLM estimation (confidence: {nutrition.get('confidence', 0):.0%})[/green]")
+                else:
+                    console.print("[yellow]⚠ Heuristic estimation (LLM unavailable)[/yellow]")
+
+                if nutrition.get("reasoning"):
+                    console.print(f"\n[dim]Reasoning: {nutrition['reasoning']}[/dim]")
+
+            # Show nutrition summary (cache hit or fresh)
+            table = Table(title="Nutritional Estimate")
+            table.add_column("Nutrient", style="cyan")
+            table.add_column("Amount", justify="right")
+
+            table.add_row("Calories", f"{nutrition.get('calories', 0):.0f} kcal")
+            table.add_row("Protein", f"{nutrition.get('protein_g', 0):.1f} g")
+            table.add_row("Carbs", f"{nutrition.get('carbs_g', 0):.1f} g")
+            table.add_row("Fat", f"{nutrition.get('fat_g', 0):.1f} g")
+            table.add_row("Fiber", f"{nutrition.get('fiber_g', 0):.1f} g")
+
+            if nutrition.get('caffeine_mg', 0) > 0:
+                table.add_row("Caffeine", f"{nutrition.get('caffeine_mg', 0):.0f} mg")
+            if nutrition.get('alcohol_units', 0) > 0:
+                table.add_row("Alcohol", f"{nutrition.get('alcohol_units', 0):.1f} units")
+
+            console.print(table)
+
         meal_id = analytics.add_meal_with_nutrition(
             entry_date=entry_date,
             meal_type=meal_type,

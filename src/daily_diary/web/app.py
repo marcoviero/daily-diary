@@ -181,6 +181,71 @@ async def sql_query(request: Request):
     })
 
 
+@app.post("/sql/ai-suggest")
+async def sql_ai_suggest(request: Request):
+    """Generate a SQL query from a natural language question using Claude."""
+    import json as _json
+    from fastapi.responses import JSONResponse as _JSONResponse
+    from ..services.database import AnalyticsDB
+    from ..utils.config import get_settings
+
+    form_data = await request.form()
+    question = form_data.get("question", "").strip()
+    if not question:
+        return _JSONResponse({"error": "No question provided"}, status_code=400)
+
+    settings = get_settings()
+    if not settings.anthropic_api_key:
+        return _JSONResponse({"error": "ANTHROPIC_API_KEY not configured"}, status_code=400)
+
+    # Build schema string from live DB
+    schema_lines = []
+    try:
+        with AnalyticsDB() as db:
+            table_rows = db.conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+            ).fetchall()
+            for (tname,) in table_rows:
+                cols = db.conn.execute(f"PRAGMA table_info({tname})").fetchall()
+                col_defs = ", ".join(f"{c[1]} {c[2]}" for c in cols)
+                schema_lines.append(f"  {tname}({col_defs})")
+    except Exception as e:
+        return _JSONResponse({"error": f"Schema read failed: {e}"}, status_code=500)
+
+    schema = "\n".join(schema_lines)
+    system = f"""You are a SQL expert helping analyze a personal health diary stored in SQLite.
+
+Tables:
+{schema}
+
+Rules:
+- entry_date fields are TEXT 'YYYY-MM-DD'
+- Severity is 0-10; has_neuralgiaform is 1/0 (neuralgiform headache days)
+- Only write SELECT queries — never INSERT/UPDATE/DELETE/DROP
+
+Return ONLY valid JSON with exactly two keys:
+{{"sql": "<SELECT statement>", "explanation": "<one sentence>"}}"""
+
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+        resp = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=600,
+            system=system,
+            messages=[{"role": "user", "content": question}],
+        )
+        text = resp.content[0].text.strip()
+        if "```json" in text:
+            text = text.split("```json")[1].split("```")[0].strip()
+        elif "```" in text:
+            text = text.split("```")[1].split("```")[0].strip()
+        parsed = _json.loads(text)
+        return _JSONResponse(parsed)
+    except Exception as e:
+        return _JSONResponse({"error": str(e)}, status_code=500)
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""

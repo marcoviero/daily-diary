@@ -104,7 +104,9 @@ Start by greeting them warmly and asking what brings them in today."""
         """
         end_date = date.today()
         start_date = end_date - timedelta(days=days)
-        
+        start_str = start_date.isoformat()
+        end_str = end_date.isoformat()
+
         context_parts = []
         
         # Get user profile first
@@ -330,7 +332,7 @@ Start by greeting them warmly and asking what brings them in today."""
                     FROM meals
                     WHERE entry_date >= ? AND entry_date <= ?
                     ORDER BY entry_date DESC, time_consumed
-                """, db.conn, params=[start_date, end_date])
+                """, db.conn, params=[start_str, end_str])
                 
                 if not meals_df.empty:
                     context_parts.append("--- MEALS (Last 14 days) ---")
@@ -358,7 +360,7 @@ Start by greeting them warmly and asking what brings them in today."""
                     FROM vitals
                     WHERE entry_date >= ? AND entry_date <= ?
                     ORDER BY entry_date DESC
-                """, db.conn, params=[start_date, end_date])
+                """, db.conn, params=[start_str, end_str])
                 
                 if not vitals_df.empty:
                     context_parts.append("--- VITALS ---")
@@ -387,7 +389,7 @@ Start by greeting them warmly and asking what brings them in today."""
                     FROM activities
                     WHERE entry_date >= ? AND entry_date <= ?
                     ORDER BY entry_date DESC, start_time DESC
-                """, db.conn, params=[start_date, end_date])
+                """, db.conn, params=[start_str, end_str])
                 
                 if not all_activities_df.empty:
                     context_parts.append("--- ACTIVITIES ---")
@@ -412,7 +414,7 @@ Start by greeting them warmly and asking what brings them in today."""
                     WHERE entry_date >= ? AND entry_date <= ?
                       AND duration_minutes > 0
                     ORDER BY entry_date DESC
-                """, db.conn, params=[start_date, end_date])
+                """, db.conn, params=[start_str, end_str])
                 
                 if not meditation_df.empty:
                     context_parts.append("--- MEDITATION ---")
@@ -426,7 +428,7 @@ Start by greeting them warmly and asking what brings them in today."""
                     FROM daily_factors
                     WHERE entry_date >= ? AND entry_date <= ?
                     ORDER BY entry_date DESC
-                """, db.conn, params=[start_date, end_date])
+                """, db.conn, params=[start_str, end_str])
                 
                 if not factors_df.empty:
                     context_parts.append("--- SLEEP DISRUPTION FACTORS ---")
@@ -447,7 +449,7 @@ Start by greeting them warmly and asking what brings them in today."""
                     WHERE entry_date >= ? AND entry_date <= ?
                       AND (total_caffeine_mg > 0 OR total_alcohol_units > 0)
                     ORDER BY entry_date DESC
-                """, db.conn, params=[start_date, end_date])
+                """, db.conn, params=[start_str, end_str])
                 
                 if not totals_df.empty:
                     context_parts.append("--- CAFFEINE & ALCOHOL TOTALS ---")
@@ -588,7 +590,7 @@ Start by greeting them warmly and asking what brings them in today."""
                 messages.append({"role": "user", "content": user_message})
             
             response = self.anthropic_client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-opus-4-8",
                 max_tokens=1500,
                 system=system_prompt,
                 messages=messages,

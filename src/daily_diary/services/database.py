@@ -698,6 +698,35 @@ class AnalyticsDB:
             1 if entry.is_complete else 0, datetime.now().isoformat()
         ])
     
+    def find_cached_meal_nutrition(self, description: str, meal_type: str) -> Optional[dict]:
+        """Return the most recent LLM nutrition result for an identical description+meal_type."""
+        row = self.conn.execute("""
+            SELECT calories, protein_g, carbs_g, fat_g, fiber_g, sugar_g, sodium_mg,
+                   water_ml, caffeine_mg, alcohol_units, estimation_confidence, llm_reasoning
+            FROM meals
+            WHERE LOWER(description) = LOWER(?) AND meal_type = ? AND nutrition_source = 'llm'
+            ORDER BY created_at DESC
+            LIMIT 1
+        """, [description, meal_type]).fetchone()
+        if row is None:
+            return None
+        return {
+            "calories": row["calories"],
+            "protein_g": row["protein_g"],
+            "carbs_g": row["carbs_g"],
+            "fat_g": row["fat_g"],
+            "fiber_g": row["fiber_g"],
+            "sugar_g": row["sugar_g"],
+            "sodium_mg": row["sodium_mg"],
+            "water_ml": row["water_ml"],
+            "caffeine_mg": row["caffeine_mg"],
+            "alcohol_units": row["alcohol_units"],
+            "confidence": row["estimation_confidence"],
+            "reasoning": row["llm_reasoning"],
+            "source": "llm",
+            "cached": True,
+        }
+
     def add_meal_with_nutrition(
         self,
         entry_date: date,

@@ -54,34 +54,40 @@
             <!-- Quick Queries -->
             <h3 class="text-sm font-medium text-slate-400 mt-4 mb-2">Quick Queries</h3>
             <div class="space-y-1">
-                <button onclick="runQuickQuery('SELECT name, (SELECT COUNT(*) FROM meals) as rows FROM sqlite_master WHERE type=\'table\' AND name NOT LIKE \'sqlite_%\' ORDER BY name')" 
+                <button onclick="runQuickQuery('SELECT name, (SELECT COUNT(*) FROM meals) as rows FROM sqlite_master WHERE type=\'table\' AND name NOT LIKE \'sqlite_%\' ORDER BY name')"
                         class="w-full text-left text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded">
                     Table list
                 </button>
-                <button onclick="runQuickQuery('SELECT * FROM meals ORDER BY entry_date DESC LIMIT 20')" 
+                <button onclick="runQuickQuery('SELECT * FROM meals ORDER BY entry_date DESC LIMIT 20')"
                         class="w-full text-left text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded">
                     Recent meals
                 </button>
-                <button onclick="runQuickQuery('SELECT * FROM symptoms ORDER BY entry_date DESC LIMIT 20')" 
+                <button onclick="runQuickQuery('SELECT * FROM symptoms ORDER BY entry_date DESC LIMIT 20')"
                         class="w-full text-left text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded">
                     Recent symptoms
                 </button>
-                <button onclick="runQuickQuery('SELECT * FROM medications ORDER BY entry_date DESC LIMIT 20')" 
+                <button onclick="runQuickQuery('SELECT * FROM medications ORDER BY entry_date DESC LIMIT 20')"
                         class="w-full text-left text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded">
                     Recent medications
                 </button>
-                <button onclick="runQuickQuery('SELECT entry_date, COUNT(*) as meal_count, SUM(calories) as total_cal FROM meals GROUP BY entry_date ORDER BY entry_date DESC')" 
+                <button onclick="runQuickQuery('SELECT entry_date, COUNT(*) as meal_count, SUM(calories) as total_cal FROM meals GROUP BY entry_date ORDER BY entry_date DESC')"
                         class="w-full text-left text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded">
                     Daily meal summary
                 </button>
-                <button onclick="runQuickQuery('PRAGMA table_info(meals)')" 
+                <button onclick="runQuickQuery('PRAGMA table_info(meals)')"
                         class="w-full text-left text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded">
                     Meals schema
                 </button>
-                <button onclick="runQuickQuery('PRAGMA database_size')" 
+                <button onclick="runQuickQuery('PRAGMA database_size')"
                         class="w-full text-left text-xs px-2 py-1 bg-red-900/50 hover:bg-red-800 rounded text-red-400">
                     Database size info
                 </button>
+            </div>
+
+            <!-- Saved Queries -->
+            <h3 class="text-sm font-medium text-slate-400 mt-4 mb-2">Saved Queries</h3>
+            <div id="saved-queries-list" class="space-y-1 text-xs max-h-48 overflow-y-auto">
+                <div class="text-slate-500 italic" id="no-saved-msg">No saved queries</div>
             </div>
         </div>
     </div>
@@ -90,11 +96,26 @@
     <div class="flex-1">
         <h1 class="text-2xl font-bold text-slate-200 mb-4">🔍 SQL Explorer</h1>
         
+        <!-- AI Query Suggest -->
+        <div class="bg-slate-800 rounded-xl shadow p-4 mb-4 border border-purple-800/50">
+            <label class="block text-sm font-medium text-purple-300 mb-2">🤖 Ask AI to write a query</label>
+            <div class="flex gap-2">
+                <input type="text" id="ai-question"
+                    class="flex-1 text-sm border border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-slate-900 text-slate-200"
+                    placeholder="e.g. Show me headache days with alcohol the night before">
+                <button type="button" onclick="askAI()"
+                        class="px-4 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-600 text-sm whitespace-nowrap">
+                    Generate SQL
+                </button>
+            </div>
+            <div id="ai-status" class="text-xs text-slate-400 mt-1 hidden"></div>
+        </div>
+
         <!-- Query Input -->
         <div class="bg-slate-800 rounded-xl shadow p-4 mb-4">
             <form id="query-form" onsubmit="executeQuery(event)">
                 <label class="block text-sm font-medium text-slate-300 mb-2">SQL Query</label>
-                <textarea id="sql-input" name="sql" rows="4" 
+                <textarea id="sql-input" name="sql" rows="4"
                     class="w-full font-mono text-sm border border-slate-600 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     placeholder="SELECT * FROM meals LIMIT 10">{{ last_query or '' }}</textarea>
                 <div class="flex justify-between items-center mt-3">
@@ -102,11 +123,15 @@
                         Tip: Click table names to insert. Use LIMIT to avoid large results.
                     </div>
                     <div class="space-x-2">
-                        <button type="button" onclick="document.getElementById('sql-input').value=''" 
+                        <button type="button" onclick="saveCurrentQuery()"
+                                class="px-3 py-2 text-sm text-emerald-400 hover:text-emerald-200 border border-emerald-700 rounded-lg">
+                            Save
+                        </button>
+                        <button type="button" onclick="document.getElementById('sql-input').value=''"
                                 class="px-3 py-2 text-sm text-slate-400 hover:text-slate-200">
                             Clear
                         </button>
-                        <button type="submit" 
+                        <button type="submit"
                                 class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm">
                             Run Query
                         </button>
@@ -177,6 +202,7 @@
 </div>
 
 <script>
+// ── table click insert ──────────────────────────────────────────────────────
 function insertTableName(name) {
     const input = document.getElementById('sql-input');
     const start = input.selectionStart;
@@ -187,6 +213,7 @@ function insertTableName(name) {
     input.setSelectionRange(start + name.length, start + name.length);
 }
 
+// ── query execution ─────────────────────────────────────────────────────────
 function runQuickQuery(sql) {
     document.getElementById('sql-input').value = sql;
     executeQuery();
@@ -196,30 +223,113 @@ function executeQuery(event) {
     if (event) event.preventDefault();
     const sql = document.getElementById('sql-input').value.trim();
     if (!sql) return;
-    
-    // Submit via form to get server-side rendering
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = '/sql/';
-    
     const input = document.createElement('input');
     input.type = 'hidden';
     input.name = 'sql';
     input.value = sql;
-    
     form.appendChild(input);
     document.body.appendChild(form);
     form.submit();
 }
 
+// ── AI suggest ──────────────────────────────────────────────────────────────
+async function askAI() {
+    const question = document.getElementById('ai-question').value.trim();
+    if (!question) return;
+    const status = document.getElementById('ai-status');
+    status.textContent = 'Generating…';
+    status.classList.remove('hidden', 'text-red-400');
+    status.classList.add('text-purple-400');
+
+    try {
+        const fd = new FormData();
+        fd.append('question', question);
+        const resp = await fetch('/sql/ai-suggest', { method: 'POST', body: fd });
+        const data = await resp.json();
+
+        if (data.error) {
+            status.textContent = 'Error: ' + data.error;
+            status.classList.add('text-red-400');
+            return;
+        }
+        document.getElementById('sql-input').value = data.sql;
+        status.textContent = data.explanation || 'Done';
+        status.classList.remove('text-purple-400');
+        status.classList.add('text-slate-400');
+    } catch (e) {
+        status.textContent = 'Request failed: ' + e.message;
+        status.classList.add('text-red-400');
+    }
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && document.activeElement === document.getElementById('ai-question')) {
+        askAI();
+    }
+});
+
+// ── saved queries (localStorage) ────────────────────────────────────────────
+const SAVED_KEY = 'sql_saved_queries';
+
+function getSaved() {
+    try { return JSON.parse(localStorage.getItem(SAVED_KEY) || '[]'); } catch { return []; }
+}
+function setSaved(arr) {
+    localStorage.setItem(SAVED_KEY, JSON.stringify(arr));
+}
+
+function renderSaved() {
+    const list = document.getElementById('saved-queries-list');
+    const noMsg = document.getElementById('no-saved-msg');
+    const saved = getSaved();
+    // Clear all but the placeholder
+    list.querySelectorAll('.saved-item').forEach(el => el.remove());
+    if (saved.length === 0) {
+        noMsg.classList.remove('hidden');
+    } else {
+        noMsg.classList.add('hidden');
+        saved.forEach((item, idx) => {
+            const div = document.createElement('div');
+            div.className = 'saved-item flex items-center justify-between gap-1 p-1 rounded hover:bg-slate-700 group';
+            div.innerHTML = `
+                <button class="flex-1 text-left text-slate-300 truncate hover:text-indigo-300"
+                        onclick="runQuickQuery(${JSON.stringify(item.sql)})"
+                        title="${item.sql.replace(/"/g, '&quot;')}">${item.name}</button>
+                <button class="text-red-500 hover:text-red-300 opacity-0 group-hover:opacity-100 flex-shrink-0"
+                        onclick="deleteQuery(${idx})" title="Delete">✕</button>`;
+            list.appendChild(div);
+        });
+    }
+}
+
+function saveCurrentQuery() {
+    const sql = document.getElementById('sql-input').value.trim();
+    if (!sql) { alert('Nothing to save — write a query first.'); return; }
+    const name = prompt('Name this query:');
+    if (!name) return;
+    const saved = getSaved();
+    saved.unshift({ name: name.trim(), sql });
+    setSaved(saved);
+    renderSaved();
+}
+
+function deleteQuery(idx) {
+    const saved = getSaved();
+    saved.splice(idx, 1);
+    setSaved(saved);
+    renderSaved();
+}
+
+// ── CSV copy ────────────────────────────────────────────────────────────────
 function copyResults() {
     const table = document.getElementById('results-table');
     if (!table) return;
-    
     let csv = [];
     const headers = Array.from(table.querySelectorAll('th')).map(th => th.textContent);
     csv.push(headers.join(','));
-    
     table.querySelectorAll('tbody tr').forEach(row => {
         const cells = Array.from(row.querySelectorAll('td')).map(td => {
             let val = td.getAttribute('title') || td.textContent.trim();
@@ -230,10 +340,10 @@ function copyResults() {
         });
         csv.push(cells.join(','));
     });
-    
-    navigator.clipboard.writeText(csv.join('\n')).then(() => {
-        alert('Copied to clipboard!');
-    });
+    navigator.clipboard.writeText(csv.join('\n')).then(() => { alert('Copied to clipboard!'); });
 }
+
+// init
+renderSaved();
 </script>
 {% endblock %}
