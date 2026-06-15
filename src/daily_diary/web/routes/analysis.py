@@ -9,19 +9,43 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 from ...services.analysis import AnalysisService
+from ...services.database import AnalyticsDB
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
+
+_EPOCH = date(2020, 1, 1)
+
+
+def _resolve_date_range(days: int) -> tuple[date, date]:
+    """Convert a days parameter to (start_date, end_date).
+
+    Special values:
+      days=0  → all time (from earliest record in the DB, or fallback epoch)
+      days=-1 → year to date (Jan 1 of current year to today)
+    """
+    end_date = date.today()
+    if days == 0:
+        with AnalyticsDB() as db:
+            row = db.conn.execute(
+                "SELECT MIN(entry_date) FROM daily_summary"
+            ).fetchone()
+        earliest = row[0] if row and row[0] else _EPOCH.isoformat()
+        start_date = date.fromisoformat(earliest)
+    elif days == -1:
+        start_date = date(end_date.year, 1, 1)
+    else:
+        start_date = end_date - timedelta(days=days)
+    return start_date, end_date
 
 
 @router.get("/", response_class=HTMLResponse)
 async def analysis_dashboard(
     request: Request,
-    days: int = Query(default=90, ge=7, le=365),
+    days: int = Query(default=90, ge=-1),
 ):
     """Main analysis dashboard."""
-    end_date = date.today()
-    start_date = end_date - timedelta(days=days)
+    start_date, end_date = _resolve_date_range(days)
     
     service = AnalysisService()
     
@@ -73,11 +97,10 @@ async def analysis_dashboard(
 async def correlations_detail(
     request: Request,
     target: str = Query(default="worst_symptom_severity"),
-    days: int = Query(default=90, ge=7, le=365),
+    days: int = Query(default=90, ge=-1),
 ):
     """Detailed correlation analysis."""
-    end_date = date.today()
-    start_date = end_date - timedelta(days=days)
+    start_date, end_date = _resolve_date_range(days)
     
     service = AnalysisService()
     correlations = service.analyze_symptom_correlations(
@@ -99,11 +122,10 @@ async def correlations_detail(
 
 @router.get("/api/chart-data")
 async def get_chart_data(
-    days: int = Query(default=90, ge=7, le=365),
+    days: int = Query(default=90, ge=-1),
 ):
     """API endpoint for chart data (for dynamic updates)."""
-    end_date = date.today()
-    start_date = end_date - timedelta(days=days)
+    start_date, end_date = _resolve_date_range(days)
     
     service = AnalysisService()
     chart_data = service.generate_chart_data(start_date, end_date)
@@ -113,11 +135,10 @@ async def get_chart_data(
 
 @router.get("/api/summary")
 async def get_summary(
-    days: int = Query(default=90, ge=7, le=365),
+    days: int = Query(default=90, ge=-1),
 ):
     """API endpoint for summary statistics."""
-    end_date = date.today()
-    start_date = end_date - timedelta(days=days)
+    start_date, end_date = _resolve_date_range(days)
     
     service = AnalysisService()
     summary = service.get_summary_stats(start_date, end_date)
